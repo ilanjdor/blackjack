@@ -135,6 +135,7 @@ playRound player numberOfPlayers shoe round dealerHand results phase = do
           let card = head shoe
           let updatedShoe = tail shoe
           let updatedRound = addCardToRound card player round
+          let updatedPlayerHand = getSumOfHandForPlayer player updatedRound
           putStrLn "******************************"
           putStrLn "Players' hands:"
           putStrLn "******************************\n"
@@ -144,7 +145,17 @@ playRound player numberOfPlayers shoe round dealerHand results phase = do
           putStrLn "******************************\n"
           (showDealerHalfHiddenHand . reverse) dealerHand
           putStrLn ""
-          playRound player numberOfPlayers updatedShoe updatedRound dealerHand results PlayersHit
+          case updatedPlayerHand < 22 of
+            True -> playRound player numberOfPlayers updatedShoe updatedRound dealerHand results PlayersHit
+            False -> do
+              putStrLn $ "\nPlayer " ++ (show $ player + 1) ++ " busts.\n"
+              let updatedPlayer = player + 1
+              case updatedPlayer < numberOfPlayers of
+                True -> playRound updatedPlayer numberOfPlayers updatedShoe updatedRound dealerHand results PlayersHit
+                False -> do
+                  putStrLn $ "Dealer (revealing hidden card) has:\n"
+                  (showHand . reverse) dealerHand
+                  playRound 0 numberOfPlayers updatedShoe updatedRound dealerHand results DealerHits
         _ -> do
           putStrLn $ "\nPlayer " ++ (show $ player + 1) ++ " stands\n"
           let updatedPlayer = player + 1
