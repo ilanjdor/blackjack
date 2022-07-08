@@ -60,7 +60,22 @@ getValue (Card _ rank) = case rank of
     Ace -> 11
 
 getSumOfHand :: [Card] -> Int
-getSumOfHand xs = foldr (+) 0 (map getValue xs)
+getSumOfHand xs = getNewSumOfHand (countAcesInHand xs) (getHighSumOfHand xs)
+
+getNewSumOfHand :: Int -> Int -> Int
+getNewSumOfHand highAcesInHand highSumOfHand = case (highAcesInHand == 0) of
+  True -> highSumOfHand
+  False -> case highSumOfHand > 21 of
+    True -> getNewSumOfHand (highAcesInHand - 1) (highSumOfHand - 10)
+
+countAcesInHand :: [Card] -> Int
+countAcesInHand [] = 0
+countAcesInHand (x : xs) = case (getRank x) == Ace of
+  True -> 1 + countAcesInHand xs
+  False -> 0 + countAcesInHand xs
+
+getHighSumOfHand :: [Card] -> Int
+getHighSumOfHand xs = foldr (+) 0 (map getValue xs)
 
 getSumOfHandForPlayer :: Int -> [[Card]] -> Int
 getSumOfHandForPlayer 0 (xs : xss) = getSumOfHand xs
@@ -145,7 +160,7 @@ playRound player numberOfPlayers shoe round dealerHand results phase = do
           putStrLn "******************************\n"
           (showDealerHalfHiddenHand . reverse) dealerHand
           putStrLn ""
-          case updatedPlayerHand < 22 of
+          case updatedPlayerHand <= 21 of
             True -> playRound player numberOfPlayers updatedShoe updatedRound dealerHand results PlayersHit
             False -> do
               putStrLn $ "\nPlayer " ++ (show $ player + 1) ++ " busts.\n"
@@ -167,7 +182,7 @@ playRound player numberOfPlayers shoe round dealerHand results phase = do
               playRound 0 numberOfPlayers shoe round dealerHand results DealerHits
     DealerHits -> do
       let dealerSum = getSumOfHand dealerHand
-      case dealerSum < 17 of
+      case dealerSum <= 16 of
         True -> do
           putStrLn $ "\nDealer hits (16 or below):\n"
           let card = head shoe
@@ -183,7 +198,7 @@ playRound player numberOfPlayers shoe round dealerHand results phase = do
           putStrLn "******************************\n"
           (showHand . reverse) updatedDealerHand
           putStrLn ""
-          case updatedDealerSum < 22 of
+          case updatedDealerSum <= 21 of
             True -> playRound 0 numberOfPlayers updatedShoe round updatedDealerHand results DealerHits
             False -> do
               putStrLn $ "\nDealer busts:\n"
