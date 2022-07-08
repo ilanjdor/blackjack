@@ -30,6 +30,7 @@ data Card = Card Suit Rank deriving Show
 type Hand = [Card]
 type Round = [[Card]]
 data Phase = Begin | Deal1stCard | Deal2ndCard | PlayersHit | DealerHits | Settle deriving (Enum, Read, Show)
+data Result = Pending | Blackjack | PlayerBust | DealerBust | LowerThanDealer | SameAsDealer | HigherThanDealer deriving (Enum, Read, Show)
 
 --Taken from:
 --https://www.reddit.com/r/haskell/comments/3r8x5m/comment/cwlxnvy/?utm_source=share&utm_medium=web2x&context=3
@@ -59,14 +60,20 @@ getValue (Card _ rank) = case rank of
     King -> 10
     Ace -> 11
 
-getSumOfHand :: [Card] -> Int
-getSumOfHand xs = getNewSumOfHand (countAcesInHand xs) (getHighSumOfHand xs)
+getResult :: Int -> [Result] -> Result
+getResult 0 (x : xs) = x
+getResult player (x : xs) = getResult (player - 1) xs
 
-getNewSumOfHand :: Int -> Int -> Int
-getNewSumOfHand highAcesInHand highSumOfHand = case (highAcesInHand == 0) of
-  True -> highSumOfHand
-  False -> case highSumOfHand > 21 of
-    True -> getNewSumOfHand (highAcesInHand - 1) (highSumOfHand - 10)
+setResult :: Result -> Int -> [Result] -> [Result]
+setResult result 0 [] = [result]
+setResult result 0 (x : xs) = result : xs
+setResult result player (x : xs) = x : (setResult result (player - 1) xs)
+
+determineResult :: Int -> Result
+determineResult sumOfHand
+  | sumOfHand < 21 = Pending
+  | sumOfHand == 21 = Blackjack
+  | sumOfHand > 21 = PlayerBust
 
 countAcesInHand :: [Card] -> Int
 countAcesInHand [] = 0
@@ -77,6 +84,14 @@ countAcesInHand (x : xs) = case (getRank x) == Ace of
 getHighSumOfHand :: [Card] -> Int
 getHighSumOfHand xs = foldr (+) 0 (map getValue xs)
 
+getNewSumOfHand :: Int -> Int -> Int
+getNewSumOfHand highAcesInHand highSumOfHand = case (highAcesInHand > 0 && highSumOfHand > 21) of
+  True -> getNewSumOfHand (highAcesInHand - 1) (highSumOfHand - 10)
+  False -> highSumOfHand
+
+getSumOfHand :: [Card] -> Int
+getSumOfHand xs = getNewSumOfHand (countAcesInHand xs) (getHighSumOfHand xs)
+
 getSumOfHandForPlayer :: Int -> [[Card]] -> Int
 getSumOfHandForPlayer 0 (xs : xss) = getSumOfHand xs
 getSumOfHandForPlayer player (xs : xss) = getSumOfHandForPlayer (player - 1) xss
@@ -86,7 +101,7 @@ addCardToRound card 0 [] = [[card]]
 addCardToRound card 0 (xs : xss) = (card : xs) : xss
 addCardToRound card player (xs : xss) = xs : (addCardToRound card (player - 1) xss)
 
-playRound :: Int -> Int -> [Card] -> [[Card]] -> [Card] -> [Bool] -> Phase -> IO ()
+playRound :: Int -> Int -> [Card] -> [[Card]] -> [Card] -> [Result] -> Phase -> IO ()
 playRound player numberOfPlayers shoe round dealerHand results phase = do
   case phase of
     Begin -> do
@@ -118,6 +133,10 @@ playRound player numberOfPlayers shoe round dealerHand results phase = do
       let card = head shoe
       let updatedShoe = tail shoe
       let updatedRound = addCardToRound card player round
+      let sumOfHand = getSumOfHandForPlayer player updatedRound
+      let result = determineResult sumOfHand
+      let updatedResults = setResult result player results
+      showBlackjack player sumOfHand
       showRound updatedRound
       putStrLn ""
       let updatedPlayer = player + 1
@@ -232,6 +251,11 @@ playRound player numberOfPlayers shoe round dealerHand results phase = do
         False -> do
           putStrLn "End of round\n"
 
+showBlackjack :: Int -> Int -> IO ()
+showBlackjack player sumOfHand = case sumOfHand of
+  21 -> putStrLn $ "Player " ++ (show $ player + 1) ++ " scored Blackjack (3:2 payoff)!\n"
+  _ -> return ()
+
 showCard :: Card -> String
 showCard card = let rank = (getRank card) in
   case rank == Jack || rank == Queen || rank == King || rank == Ace of
@@ -263,4 +287,4 @@ main = do
   numberOfPlayers <- getLine
   let p = (read numberOfPlayers :: Int)
   putStrLn ""
-  playRound 0 p ([]) ([]) ([]) ([]) Begin
+  playRound 0 p ([]) ([]) ([]) (take p $ repeat Pending) Begin
