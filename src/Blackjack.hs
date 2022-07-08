@@ -220,8 +220,8 @@ playRound player numberOfPlayers shoe round dealerHand results phase = do
 showCard :: Card -> String
 showCard card = let rank = (getRank card) in
   case rank == Jack || rank == Queen || rank == King || rank == Ace of
-    True -> (show $ rank) ++ " " ++ (show $ getSuit card)
-    False -> (show $ getValue card) ++ " " ++ (show $ getSuit card)
+    True -> [head (show $ rank)] ++ " " ++ [head (show $ getSuit card)]
+    False -> (show $ getValue card) ++ " " ++ [head (show $ getSuit card)]
 
 showHand :: Hand -> IO ()
 showHand [x]       = do
