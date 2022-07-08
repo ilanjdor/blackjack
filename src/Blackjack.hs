@@ -60,8 +60,7 @@ getValue (Card _ rank) = case rank of
     Ace -> 11
 
 getSumOfHand :: [Card] -> Int
-getSumOfHand [] = 0
-getSumOfHand (x : xs) = (getValue x) + (getSumOfHand xs)
+getSumOfHand xs = foldr (+) 0 (map getValue xs)
 
 getSumOfHandForPlayer :: Int -> [[Card]] -> Int
 getSumOfHandForPlayer 0 (xs : xss) = getSumOfHand xs
@@ -200,7 +199,6 @@ playRound player numberOfPlayers shoe round dealerHand results phase = do
           putStrLn ""
           playRound 0 numberOfPlayers shoe round dealerHand results Settle
     Settle -> do
-
       putStrLn $ "Dealer settles with Player " ++ (show $ player + 1) ++ ":\n"
       let updatedPlayer = player + 1
       case updatedPlayer < numberOfPlayers of
