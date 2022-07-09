@@ -115,52 +115,53 @@ playRound :: Int -> Int -> [Card] -> [[Card]] -> [Card] -> [Result] -> Phase -> 
 playRound player numberOfPlayers shoe round dealerHand results phase = do
   case phase of
     Begin -> do
-      shoe <- shuffle allCards
-      putStrLn "Here is the shoe:\n"
-      showHand shoe
-      putStrLn ""
-      playRound player numberOfPlayers shoe round dealerHand results Deal1stCard
+      deck <- shuffle allCards
+      let updatedShoe = concat $ take 6 $ repeat deck 
+      --putStrLn "Here is the shoe:\n"
+      --showHand updatedShoe
+      --putStrLn ""
+      playRound player numberOfPlayers updatedShoe round dealerHand results Deal1stCard
     Deal1stCard -> do
-      putStrLn $ "Deal first card to Player " ++ (show $ player + 1) ++ ":\n"
+      --putStrLn $ "Deal first card to Player " ++ (show $ player + 1) ++ ":\n"
       let card = head shoe
       let updatedShoe = tail shoe
       let updatedRound = addCardToRound card player round
-      showRound updatedRound
-      putStrLn ""
+      --showRound updatedRound
+      --putStrLn ""
       let updatedPlayer = player + 1
       case updatedPlayer < numberOfPlayers of
         True -> playRound updatedPlayer numberOfPlayers updatedShoe updatedRound dealerHand results Deal1stCard
         False -> playRound updatedPlayer numberOfPlayers updatedShoe updatedRound dealerHand results Deal1stCardToDealer
     Deal1stCardToDealer -> do
-      putStrLn $ "Deal first card to dealer\n"
+      --putStrLn $ "Deal first card to dealer\n"
       let card = head shoe
       let updatedShoe = tail shoe
       let updatedDealerHand = (card : dealerHand)
-      (showHand . reverse) updatedDealerHand
-      putStrLn ""
+      --(showHand . reverse) updatedDealerHand
+      --putStrLn ""
       playRound 0 numberOfPlayers updatedShoe round updatedDealerHand results Deal2ndCard
     Deal2ndCard -> do
-      putStrLn $ "Deal second card to Player " ++ (show $ player + 1) ++ ":\n"
+      --putStrLn $ "Deal second card to Player " ++ (show $ player + 1) ++ ":\n"
       let card = head shoe
       let updatedShoe = tail shoe
       let updatedRound = addCardToRound card player round
       let sumOfHand = getSumOfHandForPlayer player updatedRound
       let result = determineResult sumOfHand False
       let updatedResults = setResult result player results
-      showRound updatedRound
-      putStrLn ""
-      showResult player result
+      --showRound updatedRound
+      --putStrLn ""
+      --showResult player result
       let updatedPlayer = player + 1
       case updatedPlayer < numberOfPlayers of
         True -> playRound updatedPlayer numberOfPlayers updatedShoe updatedRound dealerHand updatedResults Deal2ndCard 
         False -> playRound updatedPlayer numberOfPlayers updatedShoe updatedRound dealerHand updatedResults Deal2ndCardToDealer
     Deal2ndCardToDealer -> do
-      putStrLn $ "Deal second card to dealer" ++ ":\n"
+      --putStrLn $ "Deal second card to dealer" ++ ":\n"
       let card = head shoe
       let updatedShoe = tail shoe
       let updatedDealerHand = (card : dealerHand)
-      (showDealerHalfHiddenHand . reverse) updatedDealerHand
-      putStrLn ""
+      --(showDealerHalfHiddenHand . reverse) updatedDealerHand
+      --putStrLn ""
       showRoundAndHand round updatedDealerHand False False
       putStrLn ""
       playRound 0 numberOfPlayers updatedShoe round updatedDealerHand results PlayersHit
@@ -191,7 +192,7 @@ playRound player numberOfPlayers shoe round dealerHand results phase = do
                     False -> do
                       putStrLn $ "Dealer (revealing hidden card) has:\n"
                       (showHand . reverse) dealerHand
-                      playRound 0 numberOfPlayers updatedShoe updatedRound dealerHand results DealerHits
+                      playRound 0 numberOfPlayers updatedShoe updatedRound dealerHand updatedResults DealerHits
             _ -> do
               putStrLn $ "\nPlayer " ++ (show $ player + 1) ++ " stands\n"
               let updatedPlayer = player + 1
@@ -228,41 +229,39 @@ playRound player numberOfPlayers shoe round dealerHand results phase = do
         False -> do
           putStrLn $ "\nDealer stands (17 or above):\n"
           showRoundAndHand round dealerHand True True
-          playRound 0 numberOfPlayers shoe round dealerHand results Settle
+          playRound 0 numberOfPlayers shoe round dealerHand results FinalResults
     FinalResults -> do
           let result = determineFinalResult (getSumOfHandForPlayer player round) (results !! player) (getSumOfHand dealerHand)
-          let updatedResults = setResult result player results
+          let updatedResults = setFinalResult result player results
           let updatedPlayer = player + 1
           case updatedPlayer < numberOfPlayers of
             True -> playRound updatedPlayer numberOfPlayers shoe round dealerHand updatedResults FinalResults
-            False -> playRound 0 numberOfPlayers shoe round dealerHand updatedResults Settle
+            False -> do
+              putStrLn $ "\nDealer settles with players:"
+              putStrLn "\n******************************"
+              putStrLn "Player payoffs:"
+              putStrLn "******************************\n"
+              playRound 0 numberOfPlayers shoe round dealerHand updatedResults Settle
     Settle -> do
-      putStrLn $ "Dealer settles with players:"
+      showFinalResult player (results !! player)
       let updatedPlayer = player + 1
       case updatedPlayer < numberOfPlayers of
         True -> playRound updatedPlayer numberOfPlayers shoe round dealerHand results Settle 
         False -> do
+          putStrLn "\n******************************\n"
           putStrLn "End of round\n"
-
-{- showAllResults :: [Results] -> IO ()
-showAllResults results = do
-  putStrLn "******************************"
-  putStrLn "Players' results:"
-  putStrLn "******************************\n"
-  showRound round
-  putStrLn "\n******************************" -}
 
 showFinalResult :: Int -> Result -> IO ()
 showFinalResult player result = do
   putStr $ "Player " ++ (show $ player + 1)
   case result of
-    Blackjack -> putStrLn " scored Blackjack and already won a 3:2 payoff (+ 150%)"
-    Hit21 -> putStrLn " "
-    PlayerBust -> putStrLn " busted and already lost bet amount (- 100%)"
-    DealerBust -> putStrLn " survived dealer bust and wins a 1:1 payoff (+ 100%)"
-    LowerThanDealer -> putStrLn " scored lower than dealer and loses bet amount (- 100%)"
-    SameAsDealer -> putStrLn " ties dealer and reclaims bet amount (+ 0%)"
-    HigherThanDealer -> putStrLn " scored higher than dealer and wins a 1:1 payoff (+ 100%)"
+    Blackjack -> putStrLn " scored Blackjack and already won a 3:2 payoff (+150%)"
+    PlayerBust -> putStrLn " busted and already lost bet amount (-100%)"
+    DealerBust -> putStrLn " survived dealer bust and wins a 1:1 payoff (+100%)"
+    LowerThanDealer -> putStrLn " scored lower than dealer and loses bet amount (-100%)"
+    SameAsDealer -> putStrLn " ties dealer and reclaims bet amount (+0%)"
+    HigherThanDealer -> putStrLn " scored higher than dealer and wins a 1:1 payoff (+100%)"
+    _ -> putStrLn "Missing case!"
 
 showResult :: Int -> Result -> IO ()
 showResult player result = case result of
@@ -307,7 +306,7 @@ showRoundAndHand round hand roundFinalized handFinalized = do
   case roundFinalized of
     True -> (showHand . reverse) hand
     False -> (showDealerHalfHiddenHand . reverse) hand
-  putStrLn "\n******************************\n"
+  putStrLn "\n******************************"
 
 showDealerHalfHiddenHand :: Hand -> IO ()
 showDealerHalfHiddenHand [x]       = do
