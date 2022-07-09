@@ -141,7 +141,7 @@ playRound player numberOfPlayers shoe round dealerHand results phase = do
       showBlackjack player sumOfHand
       let updatedPlayer = player + 1
       case updatedPlayer < numberOfPlayers of
-        True -> playRound updatedPlayer numberOfPlayers updatedShoe updatedRound dealerHand results Deal2ndCard 
+        True -> playRound updatedPlayer numberOfPlayers updatedShoe updatedRound dealerHand updatedResults Deal2ndCard 
         False -> do
           putStrLn $ "Deal second card to dealer" ++ ":\n"
           let card = head updatedShoe
@@ -151,7 +151,7 @@ playRound player numberOfPlayers shoe round dealerHand results phase = do
           putStrLn ""
           showRoundAndHand updatedRound updatedDealerHand False False
           putStrLn ""
-          playRound 0 numberOfPlayers updatedShoe2 updatedRound updatedDealerHand results PlayersHit
+          playRound 0 numberOfPlayers updatedShoe2 updatedRound updatedDealerHand updatedResults PlayersHit
     PlayersHit -> do
       putStrLn $ "Player " ++ (show $ player + 1) ++ ", would you like to hit? (0 to hit; any other number to stand)"
       move <- getLine
