@@ -214,34 +214,29 @@ playRound player numberOfPlayers shoe round dealerHand results phase = do
       let dealerSum = getSumOfHand dealerHand
       case dealerSum <= 16 of
         True -> do
-          putStrLn $ "\nDealer hits (16 or below):\n"
+          showDealerResult dealerSum
           let card = head shoe
           let updatedShoe = tail shoe
           let updatedDealerHand = (card : dealerHand)
           let updatedDealerSum = getSumOfHand updatedDealerHand
           showRoundAndHand round updatedDealerHand True False
-          case updatedDealerSum <= 21 of
-            True -> playRound 0 numberOfPlayers updatedShoe round updatedDealerHand results DealerHits
-            False -> do
-              putStrLn $ "\nDealer busts!\n"
-              showRoundAndHand round updatedDealerHand True True
-              playRound 0 numberOfPlayers updatedShoe round updatedDealerHand results FinalResults
+          playRound 0 numberOfPlayers updatedShoe round updatedDealerHand results DealerHits
         False -> do
-          putStrLn $ "\nDealer stands (17 or above):\n"
+          showDealerResult dealerSum
           showRoundAndHand round dealerHand True True
           playRound 0 numberOfPlayers shoe round dealerHand results FinalResults
     FinalResults -> do
-          let result = determineFinalResult (getSumOfHandForPlayer player round) (results !! player) (getSumOfHand dealerHand)
-          let updatedResults = setFinalResult result player results
-          let updatedPlayer = player + 1
-          case updatedPlayer < numberOfPlayers of
-            True -> playRound updatedPlayer numberOfPlayers shoe round dealerHand updatedResults FinalResults
-            False -> do
-              putStrLn $ "\nDealer settles with players:"
-              putStrLn "\n******************************"
-              putStrLn "Player payoffs:"
-              putStrLn "******************************\n"
-              playRound 0 numberOfPlayers shoe round dealerHand updatedResults Settle
+      let result = determineFinalResult (getSumOfHandForPlayer player round) (results !! player) (getSumOfHand dealerHand)
+      let updatedResults = setFinalResult result player results
+      let updatedPlayer = player + 1
+      case updatedPlayer < numberOfPlayers of
+        True -> playRound updatedPlayer numberOfPlayers shoe round dealerHand updatedResults FinalResults
+        False -> do
+          putStrLn $ "\nDealer settles with players:"
+          putStrLn "\n******************************"
+          putStrLn "Player payoffs:"
+          putStrLn "******************************\n"
+          playRound 0 numberOfPlayers shoe round dealerHand updatedResults Settle
     Settle -> do
       showFinalResult player (results !! player)
       let updatedPlayer = player + 1
@@ -303,6 +298,12 @@ showResult player result = case result of
   Hit21 -> putStrLn $ "Player " ++ (show $ player + 1) ++ ", congratulations, you hit 21!\n"
   PlayerBust -> putStrLn $ "Player " ++ (show $ player + 1) ++ ", sorry, you busted!\n"
   _ -> return ()
+
+showDealerResult :: Int -> IO ()
+showDealerResult sumOfDealerHand
+  | sumOfDealerHand <= 16 = putStrLn $ "\nDealer hits (16 or below):\n"
+  | (sumOfDealerHand > 16) && (sumOfDealerHand <= 21) = putStrLn $ "\nDealer stands (17 or above):\n"
+  | sumOfDealerHand > 21 = putStrLn $ "\nDealer busts!\n"
 
 showFinalResult :: Int -> Result -> IO ()
 showFinalResult player result = do
