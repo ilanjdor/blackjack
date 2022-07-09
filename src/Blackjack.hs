@@ -12,25 +12,25 @@ import Control.Monad.State
 --   /O(N)/
 shuffle :: [a] -> IO [a]
 shuffle xs = do
-        ar <- newArray n xs
-        forM [1..n] $ \i -> do
-            j <- randomRIO (i,n)
-            vi <- readArray ar i
-            vj <- readArray ar j
-            writeArray ar j vi
-            return vj
+  ar <- newArray n xs
+  forM [1..n] $ \i -> do
+    j <- randomRIO (i,n)
+    vi <- readArray ar i
+    vj <- readArray ar j
+    writeArray ar j vi
+    return vj
   where
     n = length xs
     newArray :: Int -> [a] -> IO (IOArray Int a)
     newArray n xs =  newListArray (1,n) xs
 
-data Suit = Clubs | Diamonds | Hearts | Spades deriving (Ord, Enum, Eq, Read, Show, Bounded)
-data Rank = Two | Three | Four | Five | Six | Seven | Eight | Nine | Ten | Jack | Queen | King | Ace deriving (Ord, Enum, Eq, Read, Show, Bounded)
+data Suit = Clubs | Diamonds | Hearts | Spades deriving (Ord, Enum, Eq, Show, Bounded)
+data Rank = Two | Three | Four | Five | Six | Seven | Eight | Nine | Ten | Jack | Queen | King | Ace deriving (Ord, Enum, Eq, Show, Bounded)
 data Card = Card Suit Rank deriving Show
 type Hand = [Card]
 type Round = [[Card]]
-data Phase = Begin | Deal1stCard | Deal1stCardToDealer | Deal2ndCard | Deal2ndCardToDealer | PlayersHit | DealerHits | Settle deriving (Enum, Read, Show)
-data Result = Pending | Blackjack | Hit21 | PlayerBust | DealerBust | LowerThanDealer | SameAsDealer | HigherThanDealer deriving (Enum, Read, Show)
+data Phase = Begin | Deal1stCard | Deal1stCardToDealer | Deal2ndCard | Deal2ndCardToDealer | PlayersHit | DealerHits | FinalResults | Settle
+data Result = Pending | Blackjack | Hit21 | PlayerBust | DealerBust | LowerThanDealer | SameAsDealer | HigherThanDealer deriving Eq
 
 --Taken from:
 --https://www.reddit.com/r/haskell/comments/3r8x5m/comment/cwlxnvy/?utm_source=share&utm_medium=web2x&context=3
@@ -59,6 +59,19 @@ getValue (Card _ rank) = case rank of
     Queen -> 10
     King -> 10
     Ace -> 11
+
+setFinalResult :: Result -> Int -> [Result] -> [Result]
+setFinalResult result 0 [] = [result]
+setFinalResult result 0 (x : xs) = result : xs
+setFinalResult result player (x : xs) = x : (setFinalResult result (player - 1) xs)
+
+determineFinalResult :: Int -> Result -> Int -> Result
+determineFinalResult sumOfPlayerHand playerResult sumOfDealerHand
+  | playerResult == PlayerBust || playerResult == Blackjack = playerResult
+  | sumOfDealerHand > 21 = DealerBust
+  | sumOfPlayerHand < sumOfDealerHand = LowerThanDealer
+  | sumOfPlayerHand == sumOfDealerHand = SameAsDealer
+  | sumOfPlayerHand > sumOfDealerHand = HigherThanDealer
 
 setResult :: Result -> Int -> [Result] -> [Result]
 setResult result 0 [] = [result]
@@ -211,18 +224,45 @@ playRound player numberOfPlayers shoe round dealerHand results phase = do
             False -> do
               putStrLn $ "\nDealer busts!\n"
               showRoundAndHand round updatedDealerHand True True
-              playRound 0 numberOfPlayers updatedShoe round updatedDealerHand results Settle
+              playRound 0 numberOfPlayers updatedShoe round updatedDealerHand results FinalResults
         False -> do
           putStrLn $ "\nDealer stands (17 or above):\n"
           showRoundAndHand round dealerHand True True
           playRound 0 numberOfPlayers shoe round dealerHand results Settle
+    FinalResults -> do
+          let result = determineFinalResult (getSumOfHandForPlayer player round) (results !! player) (getSumOfHand dealerHand)
+          let updatedResults = setResult result player results
+          let updatedPlayer = player + 1
+          case updatedPlayer < numberOfPlayers of
+            True -> playRound updatedPlayer numberOfPlayers shoe round dealerHand updatedResults FinalResults
+            False -> playRound 0 numberOfPlayers shoe round dealerHand updatedResults Settle
     Settle -> do
-      putStrLn $ "Dealer settles with Player " ++ (show $ player + 1) ++ ":\n"
+      putStrLn $ "Dealer settles with players:"
       let updatedPlayer = player + 1
       case updatedPlayer < numberOfPlayers of
         True -> playRound updatedPlayer numberOfPlayers shoe round dealerHand results Settle 
         False -> do
           putStrLn "End of round\n"
+
+{- showAllResults :: [Results] -> IO ()
+showAllResults results = do
+  putStrLn "******************************"
+  putStrLn "Players' results:"
+  putStrLn "******************************\n"
+  showRound round
+  putStrLn "\n******************************" -}
+
+showFinalResult :: Int -> Result -> IO ()
+showFinalResult player result = do
+  putStr $ "Player " ++ (show $ player + 1)
+  case result of
+    Blackjack -> putStrLn " scored Blackjack and already won a 3:2 payoff (+ 150%)"
+    Hit21 -> putStrLn " "
+    PlayerBust -> putStrLn " busted and already lost bet amount (- 100%)"
+    DealerBust -> putStrLn " survived dealer bust and wins a 1:1 payoff (+ 100%)"
+    LowerThanDealer -> putStrLn " scored lower than dealer and loses bet amount (- 100%)"
+    SameAsDealer -> putStrLn " ties dealer and reclaims bet amount (+ 0%)"
+    HigherThanDealer -> putStrLn " scored higher than dealer and wins a 1:1 payoff (+ 100%)"
 
 showResult :: Int -> Result -> IO ()
 showResult player result = case result of
