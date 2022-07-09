@@ -30,7 +30,7 @@ data Card = Card Suit Rank deriving Show
 type Hand = [Card]
 type Round = [[Card]]
 data Phase = Begin | Deal1stCard | Deal1stCardToDealer | Deal2ndCard | Deal2ndCardToDealer | PlayersHit | DealerHits | Settle deriving (Enum, Read, Show)
-data Result = Pending | Blackjack | PlayerBust | DealerBust | LowerThanDealer | SameAsDealer | HigherThanDealer deriving (Enum, Read, Show)
+data Result = Pending | Blackjack | Hit21 | PlayerBust | DealerBust | LowerThanDealer | SameAsDealer | HigherThanDealer deriving (Enum, Read, Show)
 
 --Taken from:
 --https://www.reddit.com/r/haskell/comments/3r8x5m/comment/cwlxnvy/?utm_source=share&utm_medium=web2x&context=3
@@ -60,19 +60,16 @@ getValue (Card _ rank) = case rank of
     King -> 10
     Ace -> 11
 
-getResult :: Int -> [Result] -> Result
-getResult 0 (x : xs) = x
-getResult player (x : xs) = getResult (player - 1) xs
-
 setResult :: Result -> Int -> [Result] -> [Result]
 setResult result 0 [] = [result]
 setResult result 0 (x : xs) = result : xs
 setResult result player (x : xs) = x : (setResult result (player - 1) xs)
 
-determineResult :: Int -> Result
-determineResult sumOfHand
+determineResult :: Int -> Bool -> Result
+determineResult sumOfHand isHitting
   | sumOfHand < 21 = Pending
-  | sumOfHand == 21 = Blackjack
+  | sumOfHand == 21 && not (isHitting) = Blackjack
+  | sumOfHand == 21 && isHitting = Hit21
   | sumOfHand > 21 = PlayerBust
 
 countAcesInHand :: [Card] -> Int
@@ -135,11 +132,11 @@ playRound player numberOfPlayers shoe round dealerHand results phase = do
       let updatedShoe = tail shoe
       let updatedRound = addCardToRound card player round
       let sumOfHand = getSumOfHandForPlayer player updatedRound
-      let result = determineResult sumOfHand
+      let result = determineResult sumOfHand False
       let updatedResults = setResult result player results
       showRound updatedRound
       putStrLn ""
-      showBlackjack player sumOfHand
+      showResult player result
       let updatedPlayer = player + 1
       case updatedPlayer < numberOfPlayers of
         True -> playRound updatedPlayer numberOfPlayers updatedShoe updatedRound dealerHand updatedResults Deal2ndCard 
@@ -155,38 +152,50 @@ playRound player numberOfPlayers shoe round dealerHand results phase = do
       putStrLn ""
       playRound 0 numberOfPlayers updatedShoe round updatedDealerHand results PlayersHit
     PlayersHit -> do
-      putStrLn $ "Player " ++ (show $ player + 1) ++ ", would you like to hit? (0 to hit; any other number to stand)"
-      move <- getLine
-      let hit = read move
-      case hit of
-        0 -> do
-          putStrLn $ "\nPlayer " ++ (show $ player + 1) ++ " hits:\n"
-          let card = head shoe
-          let updatedShoe = tail shoe
-          let updatedRound = addCardToRound card player round
-          let updatedPlayerHand = getSumOfHandForPlayer player updatedRound
-          showRoundAndHand updatedRound dealerHand False False
-          putStrLn ""
-          case updatedPlayerHand <= 21 of
-            True -> playRound player numberOfPlayers updatedShoe updatedRound dealerHand results PlayersHit
-            False -> do
-              putStrLn $ "\nPlayer " ++ (show $ player + 1) ++ " busts.\n"
+      case (results !! player) of
+        Pending -> do
+          putStrLn $ "Player " ++ (show $ player + 1) ++ ", would you like to hit? (0 to hit; any other number to stand)"
+          move <- getLine
+          let hit = read move
+          case hit of
+            0 -> do
+              putStrLn $ "\nPlayer " ++ (show $ player + 1) ++ " hits:\n"
+              let card = head shoe
+              let updatedShoe = tail shoe
+              let updatedRound = addCardToRound card player round
+              let sumOfHand = getSumOfHandForPlayer player updatedRound
+              let result = determineResult sumOfHand True
+              let updatedResults = setResult result player results
+              showRoundAndHand updatedRound dealerHand False False
+              putStrLn ""
+              case result of
+                Pending -> playRound player numberOfPlayers updatedShoe updatedRound dealerHand updatedResults PlayersHit
+                _ -> do
+                  showResult player result
+                  let updatedPlayer = player + 1
+                  case updatedPlayer < numberOfPlayers of
+                    True -> playRound updatedPlayer numberOfPlayers updatedShoe updatedRound dealerHand updatedResults PlayersHit
+                    False -> do
+                      putStrLn $ "Dealer (revealing hidden card) has:\n"
+                      (showHand . reverse) dealerHand
+                      playRound 0 numberOfPlayers updatedShoe updatedRound dealerHand results DealerHits
+            _ -> do
+              putStrLn $ "\nPlayer " ++ (show $ player + 1) ++ " stands\n"
               let updatedPlayer = player + 1
               case updatedPlayer < numberOfPlayers of
-                True -> playRound updatedPlayer numberOfPlayers updatedShoe updatedRound dealerHand results PlayersHit
+                True -> playRound updatedPlayer numberOfPlayers shoe round dealerHand results PlayersHit
                 False -> do
                   putStrLn $ "Dealer (revealing hidden card) has:\n"
                   (showHand . reverse) dealerHand
-                  playRound 0 numberOfPlayers updatedShoe updatedRound dealerHand results DealerHits
-        _ -> do
-          putStrLn $ "\nPlayer " ++ (show $ player + 1) ++ " stands\n"
-          let updatedPlayer = player + 1
-          case updatedPlayer < numberOfPlayers of
-            True -> playRound updatedPlayer numberOfPlayers shoe round dealerHand results PlayersHit
-            False -> do
-              putStrLn $ "Dealer (revealing hidden card) has:\n"
-              (showHand . reverse) dealerHand
-              playRound 0 numberOfPlayers shoe round dealerHand results DealerHits
+                  playRound 0 numberOfPlayers shoe round dealerHand results DealerHits
+        _ ->  do
+              let updatedPlayer = player + 1
+              case updatedPlayer < numberOfPlayers of
+                True -> playRound updatedPlayer numberOfPlayers shoe round dealerHand results PlayersHit
+                False -> do
+                  putStrLn $ "Dealer (revealing hidden card) has:\n"
+                  (showHand . reverse) dealerHand
+                  playRound 0 numberOfPlayers shoe round dealerHand results DealerHits
     DealerHits -> do
       let dealerSum = getSumOfHand dealerHand
       case dealerSum <= 16 of
@@ -215,9 +224,11 @@ playRound player numberOfPlayers shoe round dealerHand results phase = do
         False -> do
           putStrLn "End of round\n"
 
-showBlackjack :: Int -> Int -> IO ()
-showBlackjack player sumOfHand = case sumOfHand of
-  21 -> putStrLn $ "Player " ++ (show $ player + 1) ++ " scored Blackjack (3:2 payoff)!\n"
+showResult :: Int -> Result -> IO ()
+showResult player result = case result of
+  Blackjack -> putStrLn $ "Player " ++ (show $ player + 1) ++ ", congratulations, you scored Blackjack (3:2 payoff)!\n"
+  Hit21 -> putStrLn $ "Player " ++ (show $ player + 1) ++ ", congratulations, you hit 21!\n"
+  PlayerBust -> putStrLn $ "Player " ++ (show $ player + 1) ++ ", sorry, you busted!\n"
   _ -> return ()
 
 showCard :: Card -> String
@@ -256,7 +267,7 @@ showRoundAndHand round hand roundFinalized handFinalized = do
   case roundFinalized of
     True -> (showHand . reverse) hand
     False -> (showDealerHalfHiddenHand . reverse) hand
-  putStrLn ""
+  putStrLn "\n******************************\n"
 
 showDealerHalfHiddenHand :: Hand -> IO ()
 showDealerHalfHiddenHand [x]       = do
