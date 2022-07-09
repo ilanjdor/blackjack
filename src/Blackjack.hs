@@ -29,7 +29,7 @@ data Rank = Two | Three | Four | Five | Six | Seven | Eight | Nine | Ten | Jack 
 data Card = Card Suit Rank deriving Show
 type Hand = [Card]
 type Round = [[Card]]
-data Phase = Begin | Deal1stCard | Deal2ndCard | PlayersHit | DealerHits | Settle deriving (Enum, Read, Show)
+data Phase = Begin | Deal1stCard | Deal1stCardToDealer | Deal2ndCard | Deal2ndCardToDealer | PlayersHit | DealerHits | Settle deriving (Enum, Read, Show)
 data Result = Pending | Blackjack | PlayerBust | DealerBust | LowerThanDealer | SameAsDealer | HigherThanDealer deriving (Enum, Read, Show)
 
 --Taken from:
@@ -120,14 +120,15 @@ playRound player numberOfPlayers shoe round dealerHand results phase = do
       let updatedPlayer = player + 1
       case updatedPlayer < numberOfPlayers of
         True -> playRound updatedPlayer numberOfPlayers updatedShoe updatedRound dealerHand results Deal1stCard
-        False -> do
-          putStrLn $ "Deal first card to dealer\n"
-          let card = head updatedShoe
-          let updatedShoe2 = tail updatedShoe
-          let updatedDealerHand = (card : dealerHand)
-          (showHand . reverse) updatedDealerHand
-          putStrLn ""
-          playRound 0 numberOfPlayers updatedShoe2 updatedRound updatedDealerHand results Deal2ndCard
+        False -> playRound updatedPlayer numberOfPlayers updatedShoe updatedRound dealerHand results Deal1stCardToDealer
+    Deal1stCardToDealer -> do
+      putStrLn $ "Deal first card to dealer\n"
+      let card = head shoe
+      let updatedShoe = tail shoe
+      let updatedDealerHand = (card : dealerHand)
+      (showHand . reverse) updatedDealerHand
+      putStrLn ""
+      playRound 0 numberOfPlayers updatedShoe round updatedDealerHand results Deal2ndCard
     Deal2ndCard -> do
       putStrLn $ "Deal second card to Player " ++ (show $ player + 1) ++ ":\n"
       let card = head shoe
@@ -142,16 +143,17 @@ playRound player numberOfPlayers shoe round dealerHand results phase = do
       let updatedPlayer = player + 1
       case updatedPlayer < numberOfPlayers of
         True -> playRound updatedPlayer numberOfPlayers updatedShoe updatedRound dealerHand updatedResults Deal2ndCard 
-        False -> do
-          putStrLn $ "Deal second card to dealer" ++ ":\n"
-          let card = head updatedShoe
-          let updatedShoe2 = tail updatedShoe
-          let updatedDealerHand = (card : dealerHand)
-          (showDealerHalfHiddenHand . reverse) updatedDealerHand
-          putStrLn ""
-          showRoundAndHand updatedRound updatedDealerHand False False
-          putStrLn ""
-          playRound 0 numberOfPlayers updatedShoe2 updatedRound updatedDealerHand updatedResults PlayersHit
+        False -> playRound updatedPlayer numberOfPlayers updatedShoe updatedRound dealerHand updatedResults Deal2ndCardToDealer
+    Deal2ndCardToDealer -> do
+      putStrLn $ "Deal second card to dealer" ++ ":\n"
+      let card = head shoe
+      let updatedShoe = tail shoe
+      let updatedDealerHand = (card : dealerHand)
+      (showDealerHalfHiddenHand . reverse) updatedDealerHand
+      putStrLn ""
+      showRoundAndHand round updatedDealerHand False False
+      putStrLn ""
+      playRound 0 numberOfPlayers updatedShoe round updatedDealerHand results PlayersHit
     PlayersHit -> do
       putStrLn $ "Player " ++ (show $ player + 1) ++ ", would you like to hit? (0 to hit; any other number to stand)"
       move <- getLine
