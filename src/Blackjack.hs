@@ -190,6 +190,7 @@ playRound player numberOfPlayers shoe round dealerHand results phase = do
             False -> do
               putStrLn $ "\nDealer (revealing hidden card) has:\n"
               (showHand . reverse) dealerHand
+              threadDelay 1000000
               playRound 0 numberOfPlayers shoe round dealerHand results DealerHits
     DealerHits -> do
       let dealerSum = getSumOfHand dealerHand
