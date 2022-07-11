@@ -69,26 +69,14 @@ getValue (Card _ rank) = case rank of
   King -> 10
   Ace -> 11
 
-determineResult :: Int -> Int -> Phase -> Result
-determineResult sumOfPlayerHand sumOfDealerHand phase
-  | (sumOfPlayerHand /= 21) && (sumOfDealerHand == 21) && (phase == NaturalsWithDealerBlackjack) = NaturalLoss
+determineResult :: Int -> Int -> Phase -> Result -> Result
+determineResult sumOfPlayerHand sumOfDealerHand phase playerResult
+  | playerResult == Blackjack || (sumOfPlayerHand == 21) && (phase == NaturalsWithoutDealerBlackjack) = Blackjack
+  | (sumOfPlayerHand < 21) && (sumOfDealerHand == 21) && (phase == NaturalsWithDealerBlackjack) = NaturalLoss
   | (sumOfPlayerHand == 21) && (sumOfDealerHand == 21) && (phase == NaturalsWithDealerBlackjack) = NaturalTie
-  | (sumOfPlayerHand == 21) && (sumOfDealerHand /= 21) && (phase == NaturalsWithDealerBlackjack) = NaturalWin
-  | sumOfPlayerHand > 21 = PlayerBust 
-  | sumOfDealerHand > 21 = DealerBust
-  | (sumOfPlayerHand < sumOfDealerHand) && (phase /= NaturalsWithDealerBlackjack) = LowerThanDealer
-  | (sumOfPlayerHand == sumOfDealerHand) && (phase /= NaturalsWithDealerBlackjack)= SameAsDealer
-  | (sumOfPlayerHand > sumOfDealerHand) && (phase /= NaturalsWithDealerBlackjack)= HigherThanDealer
-
-determineHittingResult :: Int -> Result
-determineHittingResult sumOfHand
-  | sumOfHand < 21 = Pending
-  | sumOfHand == 21 = Hit21
-  | sumOfHand > 21 = PlayerBust
-
-determineFinalResult :: Int -> Result -> Int -> Result
-determineFinalResult sumOfPlayerHand playerResult sumOfDealerHand
-  | playerResult == PlayerBust || playerResult == Blackjack = playerResult
+  | sumOfPlayerHand < 21 && (phase == PlayersHit) = Pending
+  | sumOfPlayerHand == 21 && (phase == PlayersHit) = Hit21
+  | sumOfPlayerHand > 21 && (phase == PlayersHit) = PlayerBust
   | sumOfDealerHand > 21 = DealerBust
   | sumOfPlayerHand < sumOfDealerHand = LowerThanDealer
   | sumOfPlayerHand == sumOfDealerHand = SameAsDealer
@@ -164,7 +152,7 @@ playRound currPlayerNum numberOfPlayers shoe players dealerHand phase secondOrig
           playRound 0 numberOfPlayers shoe players dealerHand NaturalsWithoutDealerBlackjack True
     NaturalsWithDealerBlackjack -> do
       let sumOfPlayerHand = getSumOfHandForPlayer currPlayerNum players
-      let result = determineResult sumOfPlayerHand 21 phase
+      let result = determineResult sumOfPlayerHand 21 phase (Pending :: Result)
       let updatedPlayers = setResultForPlayer result currPlayerNum players
       showFinalResult currPlayerNum result
       let updatedPlayerNum = currPlayerNum + 1
@@ -198,8 +186,10 @@ playRound currPlayerNum numberOfPlayers shoe players dealerHand phase secondOrig
             _ -> do
               let (card, updatedShoe) = (head shoe, tail shoe)
               let updatedPlayers = addCardToPlayerHand card currPlayerNum players
-              let sumOfHand = getSumOfHandForPlayer currPlayerNum updatedPlayers
-              let result = determineHittingResult sumOfHand
+              let sumOfPlayerHand = getSumOfHandForPlayer currPlayerNum updatedPlayers
+
+              -- Using 0 for sumOfDealerHand to denote that it isn't used by determineResult in the PlayersHit phase
+              let result = determineResult sumOfPlayerHand 0 phase (Pending :: Result)
               let updatedPlayers2 = setResultForPlayer result currPlayerNum updatedPlayers
               putStrLn ""
               showPlayersAndDealerHand updatedPlayers2 dealerHand False False
@@ -234,7 +224,7 @@ playRound currPlayerNum numberOfPlayers shoe players dealerHand phase secondOrig
       let sumOfPlayerHand = getSumOfHandForPlayer currPlayerNum players
       let result = getResultForPlayer currPlayerNum players
       let sumOfDealerHand = getSumOfHand dealerHand
-      let updatedResult = determineFinalResult sumOfPlayerHand result sumOfDealerHand
+      let updatedResult = determineResult sumOfPlayerHand sumOfDealerHand phase result
       let updatedPlayers = setResultForPlayer updatedResult currPlayerNum players
       let updatedPlayerNum = currPlayerNum + 1
       case updatedPlayerNum < numberOfPlayers of
