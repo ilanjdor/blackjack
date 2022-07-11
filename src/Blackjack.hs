@@ -181,8 +181,8 @@ playRound currPlayerNum numberOfPlayers shoe players dealerHand phase secondOrig
       let updatedPlayers = setResultForPlayer result currPlayerNum players
       let updatedPlayerNum = currPlayerNum + 1
       case updatedPlayerNum < numberOfPlayers of
-        True -> playRound updatedPlayerNum numberOfPlayers shoe players dealerHand NaturalsWithoutDealerBlackjack True
-        False -> playRound 0 numberOfPlayers shoe players dealerHand PlayersHit True
+        True -> playRound updatedPlayerNum numberOfPlayers shoe updatedPlayers dealerHand NaturalsWithoutDealerBlackjack True
+        False -> playRound 0 numberOfPlayers shoe updatedPlayers dealerHand PlayersHit True
     PlayersHit -> do
       case (getResultForPlayer currPlayerNum players) of
         Pending -> do
