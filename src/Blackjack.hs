@@ -140,7 +140,13 @@ playRound currPlayerNum numberOfPlayers shoe players dealerHand phase secondOrig
       playRound 0 numberOfPlayers updatedShoe players updatedDealerHand 
         (if secondOrigCardDealt then (CheckIfDealerHasBlackjack :: Phase) else (DealOrigCardToPlayer :: Phase)) True
     CheckIfDealerHasBlackjack -> do
-      case (getSumOfHand dealerHand) == 21 of
+      let dealerHasBlackjack = (getSumOfHand dealerHand) == 21
+      if dealerHasBlackjack then putStrLn "\nDealer has Blackjack.\n" else putStrLn ""
+      showPlayersAndDealerHand players dealerHand dealerHasBlackjack dealerHasBlackjack
+      playRound 0 numberOfPlayers shoe players dealerHand 
+        (if dealerHasBlackjack then (NaturalsWithDealerBlackjack :: Phase) 
+        else (NaturalsWithoutDealerBlackjack :: Phase)) True
+{-       case (getSumOfHand dealerHand) == 21 of
         True -> do
           putStrLn ""
           putStrLn "Dealer has Blackjack."
@@ -150,7 +156,7 @@ playRound currPlayerNum numberOfPlayers shoe players dealerHand phase secondOrig
         False -> do
           putStrLn ""
           showPlayersAndDealerHand players dealerHand False False
-          playRound 0 numberOfPlayers shoe players dealerHand (NaturalsWithoutDealerBlackjack :: Phase) True
+          playRound 0 numberOfPlayers shoe players dealerHand (NaturalsWithoutDealerBlackjack :: Phase) True -}
     NaturalsWithDealerBlackjack -> do
       let sumOfPlayerHand = getSumOfHandForPlayer currPlayerNum players
       let result = determineResult sumOfPlayerHand 21 phase (Pending :: Result)
