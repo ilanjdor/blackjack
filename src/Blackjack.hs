@@ -132,12 +132,13 @@ playRound currPlayerNum numberOfPlayers shoe players dealerHand phase secondOrig
       let updatedPlayers = addCardToPlayerHand card currPlayerNum players
       let updatedPlayerNum = currPlayerNum + 1
       playRound updatedPlayerNum numberOfPlayers updatedShoe updatedPlayers dealerHand 
-        (if updatedPlayerNum < numberOfPlayers then DealOrigCardToPlayer else DealOrigCardToDealer) secondOrigCardDealt
+        (if updatedPlayerNum < numberOfPlayers then (DealOrigCardToPlayer :: Phase) 
+        else (DealOrigCardToDealer :: Phase)) secondOrigCardDealt
     DealOrigCardToDealer -> do
       let (card, updatedShoe) = (head shoe, tail shoe)
       let updatedDealerHand = (card : dealerHand)
       playRound 0 numberOfPlayers updatedShoe players updatedDealerHand 
-        (if secondOrigCardDealt then CheckIfDealerHasBlackjack else DealOrigCardToPlayer) True
+        (if secondOrigCardDealt then (CheckIfDealerHasBlackjack :: Phase) else (DealOrigCardToPlayer :: Phase)) True
     CheckIfDealerHasBlackjack -> do
       case (getSumOfHand dealerHand) == 21 of
         True -> do
@@ -145,11 +146,11 @@ playRound currPlayerNum numberOfPlayers shoe players dealerHand phase secondOrig
           putStrLn "Dealer has Blackjack."
           putStrLn ""
           showPlayersAndDealerHand players dealerHand True True
-          playRound 0 numberOfPlayers shoe players dealerHand NaturalsWithDealerBlackjack True
+          playRound 0 numberOfPlayers shoe players dealerHand (NaturalsWithDealerBlackjack :: Phase) True
         False -> do
           putStrLn ""
           showPlayersAndDealerHand players dealerHand False False
-          playRound 0 numberOfPlayers shoe players dealerHand NaturalsWithoutDealerBlackjack True
+          playRound 0 numberOfPlayers shoe players dealerHand (NaturalsWithoutDealerBlackjack :: Phase) True
     NaturalsWithDealerBlackjack -> do
       let sumOfPlayerHand = getSumOfHandForPlayer currPlayerNum players
       let result = determineResult sumOfPlayerHand 21 phase (Pending :: Result)
@@ -158,19 +159,20 @@ playRound currPlayerNum numberOfPlayers shoe players dealerHand phase secondOrig
       let updatedPlayerNum = currPlayerNum + 1
       case updatedPlayerNum < numberOfPlayers of
         True -> playRound updatedPlayerNum numberOfPlayers shoe 
-          updatedPlayers dealerHand NaturalsWithDealerBlackjack True
+          updatedPlayers dealerHand (NaturalsWithDealerBlackjack :: Phase) True
         False -> do
           putStrLn ""
           return ()
     NaturalsWithoutDealerBlackjack -> do
       let sumOfPlayerHand = getSumOfHandForPlayer currPlayerNum players
-      let result = if sumOfPlayerHand == 21 then Blackjack else Pending
+      let result = if sumOfPlayerHand == 21 then (Blackjack :: Result) else (Pending :: Result)
       showPlayerResult currPlayerNum result
       let updatedPlayers = setResultForPlayer result currPlayerNum players
       let updatedPlayerNum = currPlayerNum + 1
       case updatedPlayerNum < numberOfPlayers of
-        True -> playRound updatedPlayerNum numberOfPlayers shoe updatedPlayers dealerHand NaturalsWithoutDealerBlackjack True
-        False -> playRound 0 numberOfPlayers shoe updatedPlayers dealerHand PlayersHit True
+        True -> playRound updatedPlayerNum numberOfPlayers shoe updatedPlayers 
+          dealerHand (NaturalsWithoutDealerBlackjack :: Phase)True
+        False -> playRound 0 numberOfPlayers shoe updatedPlayers dealerHand (PlayersHit :: Phase) True
     PlayersHit -> do
       case (getResultForPlayer currPlayerNum players) of
         Pending -> do
@@ -182,7 +184,7 @@ playRound currPlayerNum numberOfPlayers shoe players dealerHand phase secondOrig
           case hit of
             0 -> do
               let updatedPlayers = setResultForPlayer (Standing :: Result) currPlayerNum players
-              playRound currPlayerNum numberOfPlayers shoe updatedPlayers dealerHand PlayersHit True
+              playRound currPlayerNum numberOfPlayers shoe updatedPlayers dealerHand (PlayersHit :: Phase) True
             _ -> do
               let (card, updatedShoe) = (head shoe, tail shoe)
               let updatedPlayers = addCardToPlayerHand card currPlayerNum players
@@ -195,17 +197,17 @@ playRound currPlayerNum numberOfPlayers shoe players dealerHand phase secondOrig
               showPlayersAndDealerHand updatedPlayers2 dealerHand False False
               putStrLn ""
               showPlayerResult currPlayerNum result
-              playRound currPlayerNum numberOfPlayers updatedShoe updatedPlayers2 dealerHand PlayersHit True
+              playRound currPlayerNum numberOfPlayers updatedShoe updatedPlayers2 dealerHand (PlayersHit :: Phase) True
         _ ->  do
           let updatedPlayerNum = currPlayerNum + 1
           case updatedPlayerNum < numberOfPlayers of
-            True -> playRound updatedPlayerNum numberOfPlayers shoe players dealerHand PlayersHit True
+            True -> playRound updatedPlayerNum numberOfPlayers shoe players dealerHand (PlayersHit :: Phase) True
             False -> do
               putStrLn $ "\nDealer (revealing hidden card) has:\n"
               (showHand . reverse) dealerHand
               threadDelay 1000000
               putStrLn ""
-              playRound 0 numberOfPlayers shoe players dealerHand DealerHits True
+              playRound 0 numberOfPlayers shoe players dealerHand (DealerHits :: Phase) True
     DealerHits -> do
       let dealerSum = getSumOfHand dealerHand
       case dealerSum <= 16 of
@@ -215,11 +217,11 @@ playRound currPlayerNum numberOfPlayers shoe players dealerHand phase secondOrig
           let updatedDealerHand = (card : dealerHand)
           let updatedDealerSum = getSumOfHand updatedDealerHand
           showPlayersAndDealerHand players updatedDealerHand True False
-          playRound 0 numberOfPlayers updatedShoe players updatedDealerHand DealerHits True
+          playRound 0 numberOfPlayers updatedShoe players updatedDealerHand (DealerHits :: Phase) True
         False -> do
           showDealerResult dealerSum
           showPlayersAndDealerHand players dealerHand True True
-          playRound 0 numberOfPlayers shoe players dealerHand FinalResults True
+          playRound 0 numberOfPlayers shoe players dealerHand (FinalResults :: Phase) True
     FinalResults -> do
       let sumOfPlayerHand = getSumOfHandForPlayer currPlayerNum players
       let result = getResultForPlayer currPlayerNum players
@@ -228,18 +230,18 @@ playRound currPlayerNum numberOfPlayers shoe players dealerHand phase secondOrig
       let updatedPlayers = setResultForPlayer updatedResult currPlayerNum players
       let updatedPlayerNum = currPlayerNum + 1
       case updatedPlayerNum < numberOfPlayers of
-        True -> playRound updatedPlayerNum numberOfPlayers shoe updatedPlayers dealerHand FinalResults True
+        True -> playRound updatedPlayerNum numberOfPlayers shoe updatedPlayers dealerHand (FinalResults :: Phase) True
         False -> do
           putStrLn $ "\nDealer settles with players:"
           putStrLn "\n******************************"
           putStrLn "Player payoffs:"
           putStrLn "******************************\n"
-          playRound 0 numberOfPlayers shoe updatedPlayers dealerHand Settle True
+          playRound 0 numberOfPlayers shoe updatedPlayers dealerHand (Settle :: Phase) True
     Settle -> do
       showFinalResult currPlayerNum (getResultForPlayer currPlayerNum players)
       let updatedPlayerNum = currPlayerNum + 1
       case updatedPlayerNum < numberOfPlayers of
-        True -> playRound updatedPlayerNum numberOfPlayers shoe players dealerHand Settle True
+        True -> playRound updatedPlayerNum numberOfPlayers shoe players dealerHand (Settle :: Phase) True
         False -> do
           putStrLn "\n******************************\n"
           putStrLn "End of round\n"
@@ -369,4 +371,4 @@ main = do
   let d = (read numberOfDecks :: Int)
   deck <- shuffle allCards
   shoe <- shuffle (concat $ take d $ repeat deck)
-  playRound 0 p shoe ([]) ([]) DealOrigCardToPlayer False
+  playRound 0 p shoe ([]) ([]) (DealOrigCardToPlayer :: Phase) False
