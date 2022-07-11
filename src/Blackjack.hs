@@ -227,17 +227,28 @@ showResult result = case result of
   Pending -> return ()
   _ -> putStr $ " (" ++ (show result) ++ ")"
 
-showCard :: Card -> String
+showSuit :: Suit -> IO ()
+showSuit suit = case suit of
+  Clubs -> putStr "\9827" -- ♣
+  Diamonds -> putStr "\9830" -- ♦
+  Hearts -> putStr "\9829" -- ♥
+  Spades -> putStr "\9824" -- ♠
+
+showCard :: Card -> IO ()
 showCard card = let rank = (getRank card) in
   case rank == Jack || rank == Queen || rank == King || rank == Ace of
-    True -> [head (show rank)] -- ++ " " ++ [head (show $ getSuit card)]
-    False -> (show $ getValue card) -- ++ " " ++ [head (show $ getSuit card)]
+    True -> do
+      putStr $ [head (show rank)] ++ " "
+      showSuit $ getSuit card
+    False -> do
+      putStr $ (show $ getValue card) ++ " "
+      showSuit $ getSuit card
 
 showHand :: Hand -> IO ()
 showHand [x]       = do
-  putStr $ showCard x
+  showCard x
 showHand (x : xs)  = do
-  putStr $ showCard x
+  showCard x
   putStr ", "
   showHand xs
 
@@ -263,7 +274,7 @@ showDealerHalfHiddenHand :: Hand -> IO ()
 showDealerHalfHiddenHand [x]       = do
   putStr "(Hidden)"
 showDealerHalfHiddenHand (x : xs)  = do
-  putStr $ showCard x
+  showCard x
   putStr ", "
   showDealerHalfHiddenHand xs
 
