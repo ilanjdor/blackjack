@@ -76,7 +76,7 @@ determineResult sumOfPlayerHand sumOfDealerHand phase playerResult
   | (sumOfPlayerHand == 21) && (sumOfDealerHand == 21) && (phase == NaturalsWithDealerBlackjack) = NaturalTie
   | sumOfPlayerHand < 21 && (phase == PlayerHits) = Pending
   | sumOfPlayerHand == 21 && (phase == PlayerHits) = Hit21
-  | sumOfPlayerHand > 21 && (phase == PlayerHits) = PlayerBust
+  | sumOfPlayerHand > 21 = PlayerBust
   | sumOfDealerHand > 21 = DealerBust
   | sumOfPlayerHand < sumOfDealerHand = LowerThanDealer
   | sumOfPlayerHand == sumOfDealerHand = SameAsDealer
