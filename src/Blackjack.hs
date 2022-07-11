@@ -18,7 +18,7 @@ data Result = Pending | Blackjack | NaturalLoss | NaturalTie | NaturalWin |Stand
   DealerBust | LowerThanDealer | SameAsDealer | HigherThanDealer deriving (Eq, Show)
 type Player = (Int, Result, Hand)
 
-data Phase = DealOrigCardToPlayer | DealOrigCardToDealer | Deal1stCard | Deal1stCardToDealer | Deal2ndCard | Deal2ndCardToDealer |
+data Phase = DealOrigCardToPlayer | DealOrigCardToDealer |
   CheckIfDealerHasBlackjack | NaturalsWithDealerBlackjack | NaturalsWithoutDealerBlackjack |
   PlayersHit | DealerHits | FinalResults | Settle deriving Eq
 
@@ -69,8 +69,8 @@ getValue (Card _ rank) = case rank of
   King -> 10
   Ace -> 11
 
-determineResult2 :: Int -> Int -> Phase -> Result
-determineResult2 sumOfPlayerHand sumOfDealerHand phase
+determineResult :: Int -> Int -> Phase -> Result
+determineResult sumOfPlayerHand sumOfDealerHand phase
   | (sumOfPlayerHand /= 21) && (sumOfDealerHand == 21) && (phase == NaturalsWithDealerBlackjack) = NaturalLoss
   | (sumOfPlayerHand == 21) && (sumOfDealerHand == 21) && (phase == NaturalsWithDealerBlackjack) = NaturalTie
   | (sumOfPlayerHand == 21) && (sumOfDealerHand /= 21) && (phase == NaturalsWithDealerBlackjack) = NaturalWin
@@ -79,13 +79,6 @@ determineResult2 sumOfPlayerHand sumOfDealerHand phase
   | (sumOfPlayerHand < sumOfDealerHand) && (phase /= NaturalsWithDealerBlackjack) = LowerThanDealer
   | (sumOfPlayerHand == sumOfDealerHand) && (phase /= NaturalsWithDealerBlackjack)= SameAsDealer
   | (sumOfPlayerHand > sumOfDealerHand) && (phase /= NaturalsWithDealerBlackjack)= HigherThanDealer
-
-determineNaturalsResult :: Int -> Int -> Result
-determineNaturalsResult sumOfPlayerHand sumOfDealerHand
-  | sumOfPlayerHand /= 21 && sumOfDealerHand /= 21 = Pending
-  | sumOfPlayerHand /= 21 && sumOfDealerHand == 21 = NaturalLoss
-  | sumOfPlayerHand == 21 && sumOfDealerHand /= 21 = NaturalWin
-  | sumOfPlayerHand == 21 && sumOfDealerHand == 21 = NaturalTie
 
 determineHittingResult :: Int -> Result
 determineHittingResult sumOfHand
@@ -152,43 +145,11 @@ playRound currPlayerNum numberOfPlayers shoe players dealerHand phase secondOrig
       let updatedPlayerNum = currPlayerNum + 1
       playRound updatedPlayerNum numberOfPlayers updatedShoe updatedPlayers dealerHand 
         (if updatedPlayerNum < numberOfPlayers then DealOrigCardToPlayer else DealOrigCardToDealer) secondOrigCardDealt
-{-       case updatedPlayerNum < numberOfPlayers of
-        True -> playRound updatedPlayerNum numberOfPlayers updatedShoe updatedPlayers dealerHand DealOrigCardToPlayer secondOrigCardDealt
-        False -> playRound updatedPlayerNum numberOfPlayers updatedShoe updatedPlayers dealerHand DealOrigCardToDealer secondOrigCardDealt -}
     DealOrigCardToDealer -> do
       let (card, updatedShoe) = (head shoe, tail shoe)
       let updatedDealerHand = (card : dealerHand)
-      case secondOrigCardDealt of
-        True -> playRound 0 numberOfPlayers updatedShoe players updatedDealerHand CheckIfDealerHasBlackjack True
-        False -> playRound 0 numberOfPlayers updatedShoe players updatedDealerHand DealOrigCardToPlayer True
-    {- Deal1stCard -> do
-      let (card, updatedShoe) = (head shoe, tail shoe)
-      let updatedPlayers = addCardToPlayerHand card currPlayerNum players
-      let updatedPlayerNum = currPlayerNum + 1
-      case updatedPlayerNum < numberOfPlayers of
-        True -> playRound updatedPlayerNum numberOfPlayers updatedShoe updatedPlayers dealerHand Deal1stCard
-        False -> playRound updatedPlayerNum numberOfPlayers updatedShoe updatedPlayers dealerHand Deal1stCardToDealer
-    Deal1stCardToDealer -> do
-      let (card, updatedShoe) = (head shoe, tail shoe)
-      let updatedDealerHand = (card : dealerHand)
-      playRound 0 numberOfPlayers updatedShoe players updatedDealerHand Deal2ndCard
-    Deal2ndCard -> do
-      let (card, updatedShoe) = (head shoe, tail shoe)
-      let updatedPlayers = addCardToPlayerHand card currPlayerNum players
-      --let sumOfHand = getSumOfHandForPlayer currPlayerNum updatedPlayers
-      --let result = determineHittingResult sumOfHand False
-      --let updatedPlayers2 = setResultForPlayer result currPlayerNum updatedPlayers
-      --showPlayerResult currPlayerNum result
-      let updatedPlayerNum = currPlayerNum + 1
-      case updatedPlayerNum < numberOfPlayers of
-        True -> playRound updatedPlayerNum numberOfPlayers updatedShoe updatedPlayers dealerHand Deal2ndCard 
-        False -> playRound updatedPlayerNum numberOfPlayers updatedShoe updatedPlayers dealerHand Deal2ndCardToDealer
-    Deal2ndCardToDealer -> do
-      let (card, updatedShoe) = (head shoe, tail shoe)
-      let updatedDealerHand = (card : dealerHand)
-      putStrLn ""
-      showPlayersAndDealerHand players updatedDealerHand False False
-      playRound 0 numberOfPlayers updatedShoe players updatedDealerHand CheckIfDealerHasBlackjack -}
+      playRound 0 numberOfPlayers updatedShoe players updatedDealerHand 
+        (if secondOrigCardDealt then CheckIfDealerHasBlackjack else DealOrigCardToPlayer) True
     CheckIfDealerHasBlackjack -> do
       case (getSumOfHand dealerHand) == 21 of
         True -> do
@@ -203,24 +164,24 @@ playRound currPlayerNum numberOfPlayers shoe players dealerHand phase secondOrig
           playRound 0 numberOfPlayers shoe players dealerHand NaturalsWithoutDealerBlackjack True
     NaturalsWithDealerBlackjack -> do
       let sumOfPlayerHand = getSumOfHandForPlayer currPlayerNum players
-      let result = determineResult2 sumOfPlayerHand 21 phase
+      let result = determineResult sumOfPlayerHand 21 phase
       let updatedPlayers = setResultForPlayer result currPlayerNum players
       showFinalResult currPlayerNum result
       let updatedPlayerNum = currPlayerNum + 1
       case updatedPlayerNum < numberOfPlayers of
         True -> playRound updatedPlayerNum numberOfPlayers shoe updatedPlayers dealerHand NaturalsWithDealerBlackjack True
-        False -> putStrLn ""
+        False -> do
+          putStrLn ""
+          return ()
     NaturalsWithoutDealerBlackjack -> do
       let sumOfPlayerHand = getSumOfHandForPlayer currPlayerNum players
       let result = if sumOfPlayerHand == 21 then Blackjack else Pending
       showPlayerResult currPlayerNum result
-      --showNaturalBlackjackForPlayer currPlayerNum result
       let updatedPlayers = setResultForPlayer result currPlayerNum players
       let updatedPlayerNum = currPlayerNum + 1
       case updatedPlayerNum < numberOfPlayers of
         True -> playRound updatedPlayerNum numberOfPlayers shoe players dealerHand NaturalsWithoutDealerBlackjack True
-        False -> do
-          playRound 0 numberOfPlayers shoe players dealerHand PlayersHit True
+        False -> playRound 0 numberOfPlayers shoe players dealerHand PlayersHit True
     PlayersHit -> do
       case (getResultForPlayer currPlayerNum players) of
         Pending -> do
@@ -363,36 +324,6 @@ showPlayersAndDealerHand players dealerHand playersFinalized dealerFinalized = d
     True -> (showHand . reverse) dealerHand
     False -> (showDealerHalfHiddenHand . reverse) dealerHand
   putStrLn "\n\n******************************\n"
-
-showNaturalBlackjackForPlayer :: Int -> Bool -> IO ()
-showNaturalBlackjackForPlayer playerNum bool = case bool of
-  True -> do
-    putStrLn $ "Player " ++ (show $ playerNum + 1) ++ ", congratulations, you scored Blackjack (3:2 payoff)!\n"
-    threadDelay 1000000
-  False -> return ()
-
-showResult3 :: Int -> Result -> IO ()
-showResult3 playerNum result = do
-  showPlayerNum playerNum
-  case result of
-    NaturalLoss -> putStrLn "Scored lower than dealer's Blackjack and loses bet amount (-100%)"
-    NaturalTie -> putStrLn "Ties dealer's Blackjack and reclaims bet amount (+0%)"
-    NaturalWin -> putStrLn "Scored Blackjack and already won a 3:2 payoff (+100%)"
-    _ -> return ()
-
-showResult2 :: Int -> Result -> IO ()
-showResult2 playerNum result = do
-  showPlayerNum playerNum
-  case result of
-    --Blackjack -> putStrLn "Scored Blackjack and already won a 3:2 payoff (+150%)"
-    PlayerBust -> putStrLn "Busted and already lost bet amount (-100%)"
-    DealerBust -> putStrLn "Survived dealer bust and wins a 1:1 payoff (+100%)"
-    NaturalLoss -> putStrLn "Scored lower than dealer's Blackjack and loses bet amount (-100%)"
-    NaturalTie -> putStrLn "Ties dealer's Blackjack and reclaims bet amount (+0%)"
-    NaturalWin -> putStrLn "Scored Blackjack and already won a 3:2 payoff (+100%)"
-    LowerThanDealer -> putStrLn "Scored lower than dealer and loses bet amount (-100%)"
-    SameAsDealer -> putStrLn "Ties dealer and reclaims bet amount (+0%)"
-    HigherThanDealer -> putStrLn "Scored higher than dealer and wins a 1:1 payoff (+100%)"
 
 showPlayerResult :: Int -> Result -> IO ()
 showPlayerResult playerNum result = case result of
