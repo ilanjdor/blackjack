@@ -14,7 +14,7 @@ data Card = Card Suit Rank deriving Show
 type Shoe = [Card]
 type Hand = [Card]
 
-data Result = Pending | Blackjack | NaturalLoss | NaturalTie | NaturalWin |Standing | Hit21 | PlayerBust | 
+data Result = Pending | Blackjack | NaturalLoss | NaturalTie | NaturalWin | Standing | Hit21 | PlayerBust | 
   DealerBust | LowerThanDealer | SameAsDealer | HigherThanDealer deriving (Eq, Show)
 type Player = (Int, Result, Hand)
 
