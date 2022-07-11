@@ -146,17 +146,6 @@ playRound currPlayerNum numberOfPlayers shoe players dealerHand phase secondOrig
       playRound 0 numberOfPlayers shoe players dealerHand 
         (if dealerHasBlackjack then (NaturalsWithDealerBlackjack :: Phase) 
         else (NaturalsWithoutDealerBlackjack :: Phase)) True
-{-       case (getSumOfHand dealerHand) == 21 of
-        True -> do
-          putStrLn ""
-          putStrLn "Dealer has Blackjack."
-          putStrLn ""
-          showPlayersAndDealerHand players dealerHand True True
-          playRound 0 numberOfPlayers shoe players dealerHand (NaturalsWithDealerBlackjack :: Phase) True
-        False -> do
-          putStrLn ""
-          showPlayersAndDealerHand players dealerHand False False
-          playRound 0 numberOfPlayers shoe players dealerHand (NaturalsWithoutDealerBlackjack :: Phase) True -}
     NaturalsWithDealerBlackjack -> do
       let sumOfPlayerHand = getSumOfHandForPlayer currPlayerNum players
       let result = determineResult sumOfPlayerHand 21 phase (Pending :: Result)
