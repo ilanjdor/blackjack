@@ -124,6 +124,122 @@ setResultForPlayer newResult currPlayerNum ((playerNum, result, hand) : xs) =
     True -> (playerNum, newResult, hand) : xs
     False -> (playerNum, result, hand) : (setResultForPlayer newResult currPlayerNum xs)
 
+-- IO functions to display game output
+showResult :: Result -> IO ()
+showResult result = case result of
+  Pending -> return ()
+  _ -> putStr $ " (" ++ (show result) ++ ")"
+
+showSuit :: Suit -> IO ()
+showSuit suit = case suit of
+  Clubs -> putStr "\9827" -- ♣
+  Diamonds -> putStr "\9830" -- ♦
+  Hearts -> putStr "\9829" -- ♥
+  Spades -> putStr "\9824" -- ♠
+
+showCard :: Card -> IO ()
+showCard card = let rank = (getRank card) in
+  case rank == Jack || rank == Queen || rank == King || rank == Ace of
+    True -> do
+      putStr $ [head (show rank)] ++ " "
+      showSuit $ getSuit card
+    False -> do
+      putStr $ (show $ getValue card) ++ " "
+      showSuit $ getSuit card
+
+showHand :: Hand -> IO ()
+showHand [x]       = do
+  showCard x
+showHand (x : xs)  = do
+  showCard x
+  putStr ", "
+  showHand xs
+
+showPlayerNum :: Int -> IO ()
+showPlayerNum playerNum = case playerNum < 9 of
+  True  -> putStr $ "Player  " ++ (show $ playerNum + 1) ++ ": "
+  False -> putStr $ "Player " ++ (show $ playerNum + 1) ++ ": "
+
+showPlayers :: [Player] -> IO ()
+showPlayers [(playerNum, result, hand)]       = do
+  showPlayerNum playerNum
+  (showHand . reverse) hand
+  showResult result
+  putStr "\n"
+showPlayers ((playerNum, result, hand) : xs)  = do
+  showPlayerNum playerNum
+  (showHand . reverse) hand
+  showResult result
+  putStr "\n"
+  showPlayers xs
+
+showDealerHalfHiddenHand :: Hand -> IO ()
+showDealerHalfHiddenHand [x]       = do
+  putStr "(Hidden)"
+showDealerHalfHiddenHand (x : xs)  = do
+  showCard x
+  putStr ", "
+  showDealerHalfHiddenHand xs
+
+showPlayersAndDealerHand :: [Player] -> Hand -> Bool -> Bool -> IO ()
+showPlayersAndDealerHand players dealerHand playersFinalized dealerFinalized = do
+  putStrLn "******************************"
+  putStr "Players' hands"
+  case playersFinalized of
+    True -> putStrLn " (finalized):"
+    False -> putStrLn ":"
+  putStrLn "******************************\n"
+  showPlayers players
+  putStrLn "\n******************************"
+  putStr "Dealer's hand"
+  case dealerFinalized of
+    True -> putStrLn " (finalized):"
+    False -> putStrLn ":"
+  putStrLn "******************************\n"
+  case playersFinalized of
+    True -> (showHand . reverse) dealerHand
+    False -> (showDealerHalfHiddenHand . reverse) dealerHand
+  putStrLn "\n\n******************************\n"
+
+showPlayerResult :: Int -> Result -> IO ()
+showPlayerResult playerNum result = case result of
+  Blackjack -> do
+    putStrLn $ "Player " ++ (show $ playerNum + 1) ++ ", congratulations, you scored Blackjack (3:2 payoff)!\n"
+    threadDelay 1000000
+  Hit21 -> do
+    putStrLn $ "Player " ++ (show $ playerNum + 1) ++ ", congratulations, you hit 21!\n"
+    threadDelay 1000000
+  PlayerBust -> do
+    putStrLn $ "Player " ++ (show $ playerNum + 1) ++ ", sorry, you busted!\n"
+    threadDelay 1000000
+  _ -> return ()
+
+showDealerResult :: Int -> IO ()
+showDealerResult sumOfDealerHand
+  | sumOfDealerHand <= 16 = do
+      putStrLn $ "\nDealer hits (16 or below):\n"
+      threadDelay 1000000
+  | (sumOfDealerHand > 16) && (sumOfDealerHand <= 21) = do
+      putStrLn $ "\nDealer stands (17 or above):\n"
+      threadDelay 1000000
+  | sumOfDealerHand > 21 = do
+      putStrLn $ "\nDealer busts!\n"
+      threadDelay 1000000
+
+showFinalResult :: Int -> Result -> IO ()
+showFinalResult playerNum result = do
+  showPlayerNum playerNum
+  case result of
+    Blackjack -> putStrLn "Scored Blackjack and already won a 3:2 payoff (+150%)"
+    PlayerBust -> putStrLn "Busted and already lost bet amount (-100%)"
+    DealerBust -> putStrLn "Survived dealer bust and wins a 1:1 payoff (+100%)"
+    NaturalLoss -> putStrLn "Scored lower than dealer's Blackjack and loses bet amount (-100%)"
+    NaturalTie -> putStrLn "Ties dealer's Blackjack and reclaims bet amount (+0%)"
+    LowerThanDealer -> putStrLn "Scored lower than dealer and loses bet amount (-100%)"
+    SameAsDealer -> putStrLn "Ties dealer and reclaims bet amount (+0%)"
+    HigherThanDealer -> putStrLn "Scored higher than dealer and wins a 1:1 payoff (+100%)"
+    _ -> putStrLn "Missing case!"
+
 playRound :: Int -> Int -> Shoe -> [Player] -> Hand -> Phase -> Bool -> IO ()
 playRound currPlayerNum numberOfPlayers shoe players dealerHand phase secondOrigCardDealt =
   case phase of
@@ -243,121 +359,6 @@ playRound currPlayerNum numberOfPlayers shoe players dealerHand phase secondOrig
         False -> do
           putStrLn "\n******************************\n"
           putStrLn "End of round\n"
-
-showResult :: Result -> IO ()
-showResult result = case result of
-  Pending -> return ()
-  _ -> putStr $ " (" ++ (show result) ++ ")"
-
-showSuit :: Suit -> IO ()
-showSuit suit = case suit of
-  Clubs -> putStr "\9827" -- ♣
-  Diamonds -> putStr "\9830" -- ♦
-  Hearts -> putStr "\9829" -- ♥
-  Spades -> putStr "\9824" -- ♠
-
-showCard :: Card -> IO ()
-showCard card = let rank = (getRank card) in
-  case rank == Jack || rank == Queen || rank == King || rank == Ace of
-    True -> do
-      putStr $ [head (show rank)] ++ " "
-      showSuit $ getSuit card
-    False -> do
-      putStr $ (show $ getValue card) ++ " "
-      showSuit $ getSuit card
-
-showHand :: Hand -> IO ()
-showHand [x]       = do
-  showCard x
-showHand (x : xs)  = do
-  showCard x
-  putStr ", "
-  showHand xs
-
-showPlayerNum :: Int -> IO ()
-showPlayerNum playerNum = case playerNum < 9 of
-  True  -> putStr $ "Player  " ++ (show $ playerNum + 1) ++ ": "
-  False -> putStr $ "Player " ++ (show $ playerNum + 1) ++ ": "
-
-showPlayers :: [Player] -> IO ()
-showPlayers [(playerNum, result, hand)]       = do
-  showPlayerNum playerNum
-  (showHand . reverse) hand
-  showResult result
-  putStr "\n"
-showPlayers ((playerNum, result, hand) : xs)  = do
-  showPlayerNum playerNum
-  (showHand . reverse) hand
-  showResult result
-  putStr "\n"
-  showPlayers xs
-
-showDealerHalfHiddenHand :: Hand -> IO ()
-showDealerHalfHiddenHand [x]       = do
-  putStr "(Hidden)"
-showDealerHalfHiddenHand (x : xs)  = do
-  showCard x
-  putStr ", "
-  showDealerHalfHiddenHand xs
-
-showPlayersAndDealerHand :: [Player] -> Hand -> Bool -> Bool -> IO ()
-showPlayersAndDealerHand players dealerHand playersFinalized dealerFinalized = do
-  putStrLn "******************************"
-  putStr "Players' hands"
-  case playersFinalized of
-    True -> putStrLn " (finalized):"
-    False -> putStrLn ":"
-  putStrLn "******************************\n"
-  showPlayers players
-  putStrLn "\n******************************"
-  putStr "Dealer's hand"
-  case dealerFinalized of
-    True -> putStrLn " (finalized):"
-    False -> putStrLn ":"
-  putStrLn "******************************\n"
-  case playersFinalized of
-    True -> (showHand . reverse) dealerHand
-    False -> (showDealerHalfHiddenHand . reverse) dealerHand
-  putStrLn "\n\n******************************\n"
-
-showPlayerResult :: Int -> Result -> IO ()
-showPlayerResult playerNum result = case result of
-  Blackjack -> do
-    putStrLn $ "Player " ++ (show $ playerNum + 1) ++ ", congratulations, you scored Blackjack (3:2 payoff)!\n"
-    threadDelay 1000000
-  Hit21 -> do
-    putStrLn $ "Player " ++ (show $ playerNum + 1) ++ ", congratulations, you hit 21!\n"
-    threadDelay 1000000
-  PlayerBust -> do
-    putStrLn $ "Player " ++ (show $ playerNum + 1) ++ ", sorry, you busted!\n"
-    threadDelay 1000000
-  _ -> return ()
-
-showDealerResult :: Int -> IO ()
-showDealerResult sumOfDealerHand
-  | sumOfDealerHand <= 16 = do
-      putStrLn $ "\nDealer hits (16 or below):\n"
-      threadDelay 1000000
-  | (sumOfDealerHand > 16) && (sumOfDealerHand <= 21) = do
-      putStrLn $ "\nDealer stands (17 or above):\n"
-      threadDelay 1000000
-  | sumOfDealerHand > 21 = do
-      putStrLn $ "\nDealer busts!\n"
-      threadDelay 1000000
-
-showFinalResult :: Int -> Result -> IO ()
-showFinalResult playerNum result = do
-  showPlayerNum playerNum
-  case result of
-    Blackjack -> putStrLn "Scored Blackjack and already won a 3:2 payoff (+150%)"
-    PlayerBust -> putStrLn "Busted and already lost bet amount (-100%)"
-    DealerBust -> putStrLn "Survived dealer bust and wins a 1:1 payoff (+100%)"
-    NaturalLoss -> putStrLn "Scored lower than dealer's Blackjack and loses bet amount (-100%)"
-    NaturalTie -> putStrLn "Ties dealer's Blackjack and reclaims bet amount (+0%)"
-    LowerThanDealer -> putStrLn "Scored lower than dealer and loses bet amount (-100%)"
-    SameAsDealer -> putStrLn "Ties dealer and reclaims bet amount (+0%)"
-    HigherThanDealer -> putStrLn "Scored higher than dealer and wins a 1:1 payoff (+100%)"
-    _ -> putStrLn "Missing case!"
 
 main = do
   putStrLn "Enter the number of players:"
