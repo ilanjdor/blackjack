@@ -53,19 +53,19 @@ getRank (Card _ rank) = rank
 
 getValue :: Card -> Int
 getValue (Card _ rank) = case rank of
-    Two -> 2
-    Three -> 3
-    Four -> 4
-    Five -> 5
-    Six -> 6
-    Seven -> 7
-    Eight -> 8
-    Nine -> 9
-    Ten -> 10
-    Jack -> 10
-    Queen -> 10
-    King -> 10
-    Ace -> 11
+  Two -> 2
+  Three -> 3
+  Four -> 4
+  Five -> 5
+  Six -> 6
+  Seven -> 7
+  Eight -> 8
+  Nine -> 9
+  Ten -> 10
+  Jack -> 10
+  Queen -> 10
+  King -> 10
+  Ace -> 11
 
 determineResult :: Int -> Bool -> Result
 determineResult sumOfHand isHitting
