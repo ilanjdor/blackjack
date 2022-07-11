@@ -20,7 +20,7 @@ type Player = (Int, Result, Hand)
 
 data Phase = DealOrigCardToPlayer | DealOrigCardToDealer |
   CheckIfDealerHasBlackjack | NaturalsWithDealerBlackjack | NaturalsWithoutDealerBlackjack |
-  PlayersHit | DealerHits | FinalResults | Settle deriving Eq
+  PlayerHits | DealerHits | FinalResults | Settle deriving Eq
 
 --Taken from:
 --https://wiki.haskell.org/Random_shuffle
@@ -74,9 +74,9 @@ determineResult sumOfPlayerHand sumOfDealerHand phase playerResult
   | playerResult == Blackjack || (sumOfPlayerHand == 21) && (phase == NaturalsWithoutDealerBlackjack) = Blackjack
   | (sumOfPlayerHand < 21) && (sumOfDealerHand == 21) && (phase == NaturalsWithDealerBlackjack) = NaturalLoss
   | (sumOfPlayerHand == 21) && (sumOfDealerHand == 21) && (phase == NaturalsWithDealerBlackjack) = NaturalTie
-  | sumOfPlayerHand < 21 && (phase == PlayersHit) = Pending
-  | sumOfPlayerHand == 21 && (phase == PlayersHit) = Hit21
-  | sumOfPlayerHand > 21 && (phase == PlayersHit) = PlayerBust
+  | sumOfPlayerHand < 21 && (phase == PlayerHits) = Pending
+  | sumOfPlayerHand == 21 && (phase == PlayerHits) = Hit21
+  | sumOfPlayerHand > 21 && (phase == PlayerHits) = PlayerBust
   | sumOfDealerHand > 21 = DealerBust
   | sumOfPlayerHand < sumOfDealerHand = LowerThanDealer
   | sumOfPlayerHand == sumOfDealerHand = SameAsDealer
@@ -172,8 +172,8 @@ playRound currPlayerNum numberOfPlayers shoe players dealerHand phase secondOrig
       case updatedPlayerNum < numberOfPlayers of
         True -> playRound updatedPlayerNum numberOfPlayers shoe updatedPlayers 
           dealerHand (NaturalsWithoutDealerBlackjack :: Phase)True
-        False -> playRound 0 numberOfPlayers shoe updatedPlayers dealerHand (PlayersHit :: Phase) True
-    PlayersHit -> do
+        False -> playRound 0 numberOfPlayers shoe updatedPlayers dealerHand (PlayerHits :: Phase) True
+    PlayerHits -> do
       case (getResultForPlayer currPlayerNum players) of
         Pending -> do
           putStrLn $ "Player " ++ (show $ currPlayerNum + 1) ++ 
@@ -184,24 +184,24 @@ playRound currPlayerNum numberOfPlayers shoe players dealerHand phase secondOrig
           case hit of
             0 -> do
               let updatedPlayers = setResultForPlayer (Standing :: Result) currPlayerNum players
-              playRound currPlayerNum numberOfPlayers shoe updatedPlayers dealerHand (PlayersHit :: Phase) True
+              playRound currPlayerNum numberOfPlayers shoe updatedPlayers dealerHand (PlayerHits :: Phase) True
             _ -> do
               let (card, updatedShoe) = (head shoe, tail shoe)
               let updatedPlayers = addCardToPlayerHand card currPlayerNum players
               let sumOfPlayerHand = getSumOfHandForPlayer currPlayerNum updatedPlayers
 
-              -- Using 0 for sumOfDealerHand to denote that it isn't used by determineResult in the PlayersHit phase
+              -- Using 0 for sumOfDealerHand to denote that it isn't used by determineResult in the PlayerHits phase
               let result = determineResult sumOfPlayerHand 0 phase (Pending :: Result)
               let updatedPlayers2 = setResultForPlayer result currPlayerNum updatedPlayers
               putStrLn ""
               showPlayersAndDealerHand updatedPlayers2 dealerHand False False
               putStrLn ""
               showPlayerResult currPlayerNum result
-              playRound currPlayerNum numberOfPlayers updatedShoe updatedPlayers2 dealerHand (PlayersHit :: Phase) True
+              playRound currPlayerNum numberOfPlayers updatedShoe updatedPlayers2 dealerHand (PlayerHits :: Phase) True
         _ ->  do
           let updatedPlayerNum = currPlayerNum + 1
           case updatedPlayerNum < numberOfPlayers of
-            True -> playRound updatedPlayerNum numberOfPlayers shoe players dealerHand (PlayersHit :: Phase) True
+            True -> playRound updatedPlayerNum numberOfPlayers shoe players dealerHand (PlayerHits :: Phase) True
             False -> do
               putStrLn $ "\nDealer (revealing hidden card) has:\n"
               (showHand . reverse) dealerHand
