@@ -240,6 +240,7 @@ showFinalResult playerNum result = do
     HigherThanDealer -> putStrLn "Scored higher than dealer and wins a 1:1 payoff (+100%)"
     _ -> putStrLn "Missing case!"
 
+-- recursive function that progresses the game play through the round
 playRound :: Int -> Int -> Shoe -> [Player] -> Hand -> Phase -> Bool -> IO ()
 playRound currPlayerNum numberOfPlayers shoe players dealerHand phase secondOrigCardDealt =
   case phase of
