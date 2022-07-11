@@ -14,7 +14,7 @@ data Card = Card Suit Rank deriving Show
 type Shoe = [Card]
 type Hand = [Card]
 
-data Result = Pending | Blackjack | NaturalLoss | NaturalTie | NaturalWin | Standing | Hit21 | PlayerBust | 
+data Result = Pending | Blackjack | NaturalLoss | NaturalTie | Standing | Hit21 | PlayerBust |
   DealerBust | LowerThanDealer | SameAsDealer | HigherThanDealer deriving (Eq, Show)
 type Player = (Int, Result, Hand)
 
@@ -362,7 +362,6 @@ showFinalResult playerNum result = do
     DealerBust -> putStrLn "Survived dealer bust and wins a 1:1 payoff (+100%)"
     NaturalLoss -> putStrLn "Scored lower than dealer's Blackjack and loses bet amount (-100%)"
     NaturalTie -> putStrLn "Ties dealer's Blackjack and reclaims bet amount (+0%)"
-    NaturalWin -> putStrLn "Scored Blackjack and already won a 3:2 payoff (+100%)"
     LowerThanDealer -> putStrLn "Scored lower than dealer and loses bet amount (-100%)"
     SameAsDealer -> putStrLn "Ties dealer and reclaims bet amount (+0%)"
     HigherThanDealer -> putStrLn "Scored higher than dealer and wins a 1:1 payoff (+100%)"
