@@ -71,11 +71,11 @@ getValue (Card _ rank) = case rank of
 
 determineResult :: Int -> Int -> Phase -> Result -> Result
 determineResult sumOfPlayerHand sumOfDealerHand phase playerResult
-  | playerResult == Blackjack || (sumOfPlayerHand == 21) && (phase == NaturalsWithoutDealerBlackjack) = Blackjack
-  | (sumOfPlayerHand < 21) && (sumOfDealerHand == 21) && (phase == NaturalsWithDealerBlackjack) = NaturalLoss
-  | (sumOfPlayerHand == 21) && (sumOfDealerHand == 21) && (phase == NaturalsWithDealerBlackjack) = NaturalTie
-  | sumOfPlayerHand < 21 && (phase == PlayerHits) = Pending
-  | sumOfPlayerHand == 21 && (phase == PlayerHits) = Hit21
+  | sumOfPlayerHand < 21 && (phase == NaturalsWithoutDealerBlackjack || phase == PlayerHits) = Pending
+  | playerResult == Blackjack || sumOfPlayerHand == 21 && phase == NaturalsWithoutDealerBlackjack = Blackjack
+  | sumOfPlayerHand < 21 && sumOfDealerHand == 21 && phase == NaturalsWithDealerBlackjack = NaturalLoss
+  | sumOfPlayerHand == 21 && sumOfDealerHand == 21 && phase == NaturalsWithDealerBlackjack = NaturalTie
+  | sumOfPlayerHand == 21 && phase == PlayerHits = Hit21
   | sumOfPlayerHand > 21 = PlayerBust
   | sumOfDealerHand > 21 = DealerBust
   | sumOfPlayerHand < sumOfDealerHand = LowerThanDealer
@@ -160,7 +160,10 @@ playRound currPlayerNum numberOfPlayers shoe players dealerHand phase secondOrig
           return ()
     NaturalsWithoutDealerBlackjack -> do
       let sumOfPlayerHand = getSumOfHandForPlayer currPlayerNum players
-      let result = if sumOfPlayerHand == 21 then (Blackjack :: Result) else (Pending :: Result)
+
+      --Using 0 for sumOfDealerHand to denote that
+      --it isn't used by determineResult in the NaturalsWithoutDealerBlackjack phase
+      let result = determineResult sumOfPlayerHand 0 phase (Pending :: Result)
       showPlayerResult currPlayerNum result
       let updatedPlayers = setResultForPlayer result currPlayerNum players
       let updatedPlayerNum = currPlayerNum + 1
