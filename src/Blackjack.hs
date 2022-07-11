@@ -169,7 +169,8 @@ playRound currPlayerNum numberOfPlayers shoe players dealerHand phase secondOrig
       showFinalResult currPlayerNum result
       let updatedPlayerNum = currPlayerNum + 1
       case updatedPlayerNum < numberOfPlayers of
-        True -> playRound updatedPlayerNum numberOfPlayers shoe updatedPlayers dealerHand NaturalsWithDealerBlackjack True
+        True -> playRound updatedPlayerNum numberOfPlayers shoe 
+          updatedPlayers dealerHand NaturalsWithDealerBlackjack True
         False -> do
           putStrLn ""
           return ()
@@ -185,7 +186,8 @@ playRound currPlayerNum numberOfPlayers shoe players dealerHand phase secondOrig
     PlayersHit -> do
       case (getResultForPlayer currPlayerNum players) of
         Pending -> do
-          putStrLn $ "Player " ++ (show $ currPlayerNum + 1) ++ ", would you like to hit? (0 to stand; any other number to hit)"
+          putStrLn $ "Player " ++ (show $ currPlayerNum + 1) ++ 
+            ", would you like to hit? (0 to stand; any other number to hit)"
           move <- getLine
           putStrLn ""
           let hit = read move
@@ -229,8 +231,11 @@ playRound currPlayerNum numberOfPlayers shoe players dealerHand phase secondOrig
           showPlayersAndDealerHand players dealerHand True True
           playRound 0 numberOfPlayers shoe players dealerHand FinalResults True
     FinalResults -> do
-      let result = determineFinalResult (getSumOfHandForPlayer currPlayerNum players) (getResultForPlayer currPlayerNum players) (getSumOfHand dealerHand)
-      let updatedPlayers = setResultForPlayer result currPlayerNum players
+      let sumOfPlayerHand = getSumOfHandForPlayer currPlayerNum players
+      let result = getResultForPlayer currPlayerNum players
+      let sumOfDealerHand = getSumOfHand dealerHand
+      let updatedResult = determineFinalResult sumOfPlayerHand result sumOfDealerHand
+      let updatedPlayers = setResultForPlayer updatedResult currPlayerNum players
       let updatedPlayerNum = currPlayerNum + 1
       case updatedPlayerNum < numberOfPlayers of
         True -> playRound updatedPlayerNum numberOfPlayers shoe updatedPlayers dealerHand FinalResults True
