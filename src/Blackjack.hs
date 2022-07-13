@@ -10,13 +10,15 @@ import Control.Concurrent
 data Suit = Clubs | Diamonds | Hearts | Spades deriving (Ord, Enum, Eq, Show, Bounded)
 data Rank = Two | Three | Four | Five | Six | Seven | Eight | Nine | Ten | 
   Jack | Queen | King | Ace deriving (Ord, Enum, Eq, Show, Bounded)
-data Card = Card Suit Rank deriving Show
+data Card = Card Suit Rank Bool deriving Show --Bool is shown/hidden status
 type Shoe = [Card]
 type Hand = [Card]
+type HandPair = (Hand, Hand) --(main hand, split hand)
+data MainOrSplitHand = Main | Split --Main is main hand; Split is split hand
 
 data Result = Pending | Blackjack | NaturalLoss | NaturalTie | Standing | Hit21 | PlayerBust |
   DealerBust | LowerThanDealer | SameAsDealer | HigherThanDealer deriving (Eq, Show)
-type Player = (Int, Result, Hand)
+type Player = (Int, Result, HandPair, Int, Int)
 
 data Phase = DealOrigCardToPlayer | DealOrigCardToDealer |
   CheckIfDealerHasBlackjack | NaturalsWithDealerBlackjack | NaturalsWithoutDealerBlackjack |
@@ -48,13 +50,13 @@ allRanks = [minBound..maxBound] :: [Rank]
 allCards = Card <$> allSuits <*> allRanks
 
 getSuit :: Card -> Suit
-getSuit (Card suit _) = suit
+getSuit (Card suit _ _) = suit
 
 getRank :: Card -> Rank
-getRank (Card _ rank) = rank
+getRank (Card _ rank _) = rank
 
 getValue :: Card -> Int
-getValue (Card _ rank) = case rank of
+getValue (Card _ rank _) = case rank of
   Two -> 2
   Three -> 3
   Four -> 4
@@ -82,6 +84,25 @@ determineResult sumOfPlayerHand sumOfDealerHand phase playerResult
   | sumOfPlayerHand == sumOfDealerHand = SameAsDealer
   | sumOfPlayerHand > sumOfDealerHand = HigherThanDealer
 
+addMainBetAmtToPlayer :: Card -> Int -> [Player] -> Int -> [Player]
+addMainBetAmtToPlayer card currPlayerNum [] newMainBetAmt = [(currPlayerNum, Pending :: Result, ([], []), newMainBetAmt, 0)]
+addMainBetAmtToPlayer card currPlayerNum
+  ((playerNum, result, xs, mainBetAmt, insuranceBetAmt) : ys) newMainBetAmt =
+
+  case currPlayerNum == playerNum of
+    True -> (playerNum, result, xs, newMainBetAmt, insuranceBetAmt) : ys
+    False -> (playerNum, result, xs, mainBetAmt, insuranceBetAmt) :
+      (addMainBetAmtToPlayer card currPlayerNum ys newMainBetAmt)
+
+addInsuranceBetAmtToPlayer :: Card -> Int -> [Player] -> Int -> [Player]
+addInsuranceBetAmtToPlayer card currPlayerNum
+  ((playerNum, result, xs, mainBetAmt, insuranceBetAmt) : ys) newInsuranceBetAmt =
+
+  case currPlayerNum == playerNum of
+    True -> (playerNum, result, xs, mainBetAmt, newInsuranceBetAmt) : ys
+    False -> (playerNum, result, xs, mainBetAmt, insuranceBetAmt) :
+      (addInsuranceBetAmtToPlayer card currPlayerNum ys newInsuranceBetAmt)
+
 countAcesInHand :: Hand -> Int
 countAcesInHand [] = 0
 countAcesInHand (x : xs) = case (getRank x) == Ace of
@@ -89,6 +110,7 @@ countAcesInHand (x : xs) = case (getRank x) == Ace of
   False -> 0 + countAcesInHand xs
 
 getHighSumOfHand :: Hand -> Int
+getHighSumOfHand [] = 0
 getHighSumOfHand xs = foldr (+) 0 (map getValue xs)
 
 getNewSumOfHand :: Int -> Int -> Int
@@ -99,30 +121,37 @@ getNewSumOfHand highAcesInHand highSumOfHand = case (highAcesInHand > 0 && highS
 getSumOfHand :: Hand -> Int
 getSumOfHand xs = getNewSumOfHand (countAcesInHand xs) (getHighSumOfHand xs)
 
-getSumOfHandForPlayer :: Int -> [Player] -> Int
-getSumOfHandForPlayer currPlayerNum ((playerNum, _, hand) : xs) =
+getSumOfHandForPlayer :: Int -> [Player] -> MainOrSplitHand -> Int
+getSumOfHandForPlayer currPlayerNum ((playerNum, _, (xs, ys), _, _) : zs) mainOrSplitHand =
   case currPlayerNum == playerNum of
-    True -> getSumOfHand hand
-    False -> getSumOfHandForPlayer currPlayerNum xs
+    True -> case mainOrSplitHand of
+      Main -> getSumOfHand xs
+      Split -> getSumOfHand ys
+    False -> getSumOfHandForPlayer currPlayerNum xs mainOrSplitHand
 
-addCardToPlayerHand :: Card -> Int -> [Player] -> [Player]
-addCardToPlayerHand card currPlayerNum [] = [(currPlayerNum, Pending :: Result, [card])]
-addCardToPlayerHand card currPlayerNum ((playerNum, result, xs) : ys) = 
+addCardToPlayerHand :: Card -> Int -> [Player] -> MainOrSplitHand -> [Player]
+addCardToPlayerHand card currPlayerNum
+  ((playerNum, result, (xs, ys), mainBetAmt, insuranceBetAmt) : zs) mainOrSplitHand =
+
   case currPlayerNum == playerNum of
-    True -> (playerNum, result, (card : xs)) : ys
-    False -> (playerNum, result, xs) : (addCardToPlayerHand card currPlayerNum ys)
+    True -> case mainOrSplitHand of
+      Main -> (playerNum, result, (card : xs, ys), mainBetAmt, insuranceBetAmt) : zs
+      Split -> (playerNum, result, (xs, card : ys), mainBetAmt, insuranceBetAmt) : zs
+    False -> (playerNum, result, (xs, ys), mainBetAmt, insuranceBetAmt) :
+      (addCardToPlayerHand card currPlayerNum zs mainOrSplitHand)
 
 getResultForPlayer :: Int -> [Player] -> Result
-getResultForPlayer currPlayerNum ((playerNum, result, hand) : xs) =
+getResultForPlayer currPlayerNum ((playerNum, result, _, _, _) : xs) =
   case currPlayerNum == playerNum of
     True -> result
     False -> getResultForPlayer currPlayerNum xs
 
 setResultForPlayer :: Result -> Int -> [Player] -> [Player]
-setResultForPlayer newResult currPlayerNum ((playerNum, result, hand) : xs) =
+setResultForPlayer newResult currPlayerNum ((playerNum, result, handPair, mainBetAmt, insuranceBetAmt) : xs) =
   case currPlayerNum == playerNum of
-    True -> (playerNum, newResult, hand) : xs
-    False -> (playerNum, result, hand) : (setResultForPlayer newResult currPlayerNum xs)
+    True -> (playerNum, newResult, handPair, mainBetAmt, insuranceBetAmt) : xs
+    False -> (playerNum, result, handPair, mainBetAmt, insuranceBetAmt) :
+      (setResultForPlayer newResult currPlayerNum xs)
 
 -- IO functions to display game output
 showResult :: Result -> IO ()
