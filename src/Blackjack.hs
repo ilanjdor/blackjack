@@ -243,14 +243,16 @@ showSuit suit = case suit of
   Spades   -> putStr "\9824" -- ♠
 
 showCard :: Card -> IO ()
-showCard card = let rank = (getRank card) in
-  case rank == Jack || rank == Queen || rank == King || rank == Ace of
-    True  -> do
-      putStr $ [head (show rank)] ++ " "
-      showSuit $ getSuit card
-    False -> do
-      putStr $ (show $ getValue card) ++ " "
-      showSuit $ getSuit card
+showCard card = case (getShownStatus card) of
+  True  -> let rank = (getRank card) in
+    case rank == Jack || rank == Queen || rank == King || rank == Ace of
+      True  -> do
+        putStr $ [head (show rank)] ++ " "
+        showSuit $ getSuit card
+      False -> do
+        putStr $ (show $ getValue card) ++ " "
+        showSuit $ getSuit card
+  False -> putStr "(Hidden)"
 
 showHand :: Hand-> IO ()
 showHand ([x], handStatus)     = do
@@ -291,13 +293,13 @@ showPlayers (x : xs)       = do
   showPlayer x
   showPlayers xs
 
-showDealerHalfHiddenHand :: Hand -> IO ()
+{- showDealerHalfHiddenHand :: Hand -> IO ()
 showDealerHalfHiddenHand [x]       = do
   putStr "(Hidden)"
 showDealerHalfHiddenHand (x : xs)  = do
   showCard x
   putStr ", "
-  showDealerHalfHiddenHand xs
+  showDealerHalfHiddenHand xs -}
 
 showPlayersAndDealerHand :: [Player] -> Hand -> Bool -> Bool -> IO ()
 showPlayersAndDealerHand players dealerHand playersFinalized dealerFinalized = do
@@ -314,9 +316,7 @@ showPlayersAndDealerHand players dealerHand playersFinalized dealerFinalized = d
     True  -> putStrLn " (finalized):"
     False -> putStrLn ":"
   putStrLn "******************************\n"
-  case playersFinalized of
-    True  -> (showHand . reverse) dealerHand
-    False -> (showDealerHalfHiddenHand . reverse) dealerHand
+  showHand dealerHand
   putStrLn "\n\n******************************\n"
 
 showPlayerResult :: Int -> Result -> IO ()
