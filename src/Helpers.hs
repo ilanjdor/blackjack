@@ -75,25 +75,43 @@ determineHandStatus sumOfPlayerHand sumOfDealerHand phase playerHandStatus
   | sumOfPlayerHand == sumOfDealerHand                                                                = SameAsDealer
   | sumOfPlayerHand > sumOfDealerHand                                                                 = HigherThanDealer
 
-addMainBetAmtToPlayer :: Card -> Int -> [Player] -> Double -> [Player]
-addMainBetAmtToPlayer card currPlayerNum [] newMainBetAmt =
+setMainBetAmtForPlayer :: Int -> [Player] -> Int -> [Player]
+setMainBetAmtForPlayer currPlayerNum [] newMainBetAmt =
   [(currPlayerNum, (([], Pending :: HandStatus), ([], Pending :: HandStatus)), newMainBetAmt, 0)]
-addMainBetAmtToPlayer card currPlayerNum
+setMainBetAmtForPlayer currPlayerNum
   ((playerNum, handPair, mainBetAmt, insuranceBetAmt) : ys) newMainBetAmt =
 
   case currPlayerNum == playerNum of
     True  -> (playerNum, handPair, newMainBetAmt, insuranceBetAmt) : ys
     False -> (playerNum, handPair, mainBetAmt, insuranceBetAmt) :
-      (addMainBetAmtToPlayer card currPlayerNum ys newMainBetAmt)
+      (setMainBetAmtForPlayer currPlayerNum ys newMainBetAmt)
 
-addInsuranceBetAmtToPlayer :: Card -> Int -> [Player] -> Double -> [Player]
-addInsuranceBetAmtToPlayer card currPlayerNum
+getMainBetAmtForPlayer :: Int -> [Player] -> Int
+--getMainBetAmtForPlayer currPlayerNum [] _ = 0
+getMainBetAmtForPlayer currPlayerNum
+  ((playerNum, _, mainBetAmt, _) : ys) =
+
+  case currPlayerNum == playerNum of
+    True  -> mainBetAmt
+    False -> getMainBetAmtForPlayer currPlayerNum ys
+
+setInsuranceBetAmtForPlayer :: Int -> [Player] -> Int -> [Player]
+setInsuranceBetAmtForPlayer currPlayerNum
   ((playerNum, handPair, mainBetAmt, insuranceBetAmt) : ys) newInsuranceBetAmt =
 
   case currPlayerNum == playerNum of
     True  -> (playerNum, handPair, mainBetAmt, newInsuranceBetAmt) : ys
     False -> (playerNum, handPair, mainBetAmt, insuranceBetAmt) :
-      (addInsuranceBetAmtToPlayer card currPlayerNum ys newInsuranceBetAmt)
+      (setInsuranceBetAmtForPlayer currPlayerNum ys newInsuranceBetAmt)
+
+getInsuranceBetAmtForPlayer :: Int -> [Player] -> Int
+--getMainBetAmtForPlayer currPlayerNum [] _ = 0
+getInsuranceBetAmtForPlayer currPlayerNum
+  ((playerNum, _, _, insuranceBetAmt) : ys) =
+
+  case currPlayerNum == playerNum of
+    True  -> insuranceBetAmt
+    False -> getInsuranceBetAmtForPlayer currPlayerNum ys
 
 countAcesInHand :: [Card] -> Int
 countAcesInHand []       = 0
@@ -195,6 +213,24 @@ splitHand currPlayerNum  ((playerNum,
     False -> (playerNum, ((xs, mainHandStatus), (ys, splitHandStatus)), mainBetAmt, insuranceBetAmt) :
       splitHand currPlayerNum zs
 
+doubleDownHand :: Int -> MainOrSplitHand -> [Player] -> [Player]
+doubleDownHand currPlayerNum mainOrSplitHand ((playerNum,
+  ((xs, mainHandStatus), (ys, splitHandStatus)), mainBetAmt, insuranceBetAmt) : zs) =
+
+  case currPlayerNum == playerNum of
+    True  -> case mainOrSplitHand of
+      Main -> (playerNum, ((xs, (DoubleDownUndrawn :: HandStatus)), (ys, splitHandStatus)), mainBetAmt * 2, insuranceBetAmt) : zs
+      Split -> (playerNum, ((xs, mainHandStatus), (ys, (DoubleDownUndrawn :: HandStatus))), mainBetAmt * 2, insuranceBetAmt) : zs
+    False -> (playerNum, ((xs, mainHandStatus), (ys, splitHandStatus)), mainBetAmt, insuranceBetAmt) :
+      doubleDownHand currPlayerNum mainOrSplitHand zs
+
+canDoubleDown :: Int -> MainOrSplitHand -> [Player] -> Bool
+canDoubleDown currPlayerNum mainOrSplitHand ((playerNum, ((xs, _), (ys, _)), _, _) : zs) = do
+  let hand = (if (mainOrSplitHand == Main) then xs else ys)
+  if currPlayerNum == playerNum then do
+    let sum = getSumOfHand hand in (sum >= 9 && sum <= 11)
+  else canDoubleDown currPlayerNum mainOrSplitHand zs
+
 -- IO functions to display game output
 showHandStatus :: HandStatus -> IO ()
 showHandStatus handStatus = case handStatus of
@@ -244,9 +280,13 @@ showPlayer :: Player -> IO ()
 showPlayer (playerNum, handPair, mainBetAmt, insuranceBetAmt) = do
   showPlayerNum playerNum
   showHandPair handPair
+  putStr $ "Main Bet Amt: " ++ (show mainBetAmt)
+  if insuranceBetAmt > 0 then
+    putStrLn $ "; Insurance Bet Amt: " ++ (show insuranceBetAmt)
+  else
+    putStrLn ""
   --showResult result
-  putStr "\n"
-
+  
 showPlayerNum :: Int -> IO ()
 showPlayerNum playerNum = case playerNum < 9 of
   True  -> putStr $ "Player  " ++ (show $ playerNum + 1) ++ ": "

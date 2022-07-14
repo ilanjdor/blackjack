@@ -15,7 +15,7 @@ data HandStatus = Pending | Blackjack | NaturalLoss | NaturalTie |
   Standing | Hit21 | HandBust |
   DealerBust | LowerThanDealer | SameAsDealer | HigherThanDealer deriving (Eq, Show)
 
-data MainOrSplitHand = Main | Split --Main is main hand; Split is split hand
+data MainOrSplitHand = Main | Split deriving (Eq, Show) --Main is main hand; Split is split hand
 
 data Phase = Bets | DealOrigCardToPlayer | DealOrigCardToDealer |
   CheckIfDealerHasBlackjack | NaturalsWithDealerBlackjack | NaturalsWithoutDealerBlackjack |
@@ -26,6 +26,6 @@ type Shoe = [Card]
 
 type Hand = ([Card], HandStatus)
 type HandPair = (Hand, Hand) --(main hand, split hand)
-type Player = (Int, HandPair, Double, Double)
+type Player = (Int, HandPair, Int, Int)
 
 type DealerHand = [Card]

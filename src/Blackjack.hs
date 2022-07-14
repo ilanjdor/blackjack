@@ -9,8 +9,8 @@ import Data
 import Helpers
 
 -- recursive function that progresses the game play through the round
-playRound :: Int -> Int -> Shoe -> [Player] -> DealerHand -> Phase -> Bool -> IO ()
-playRound currPlayerNum numberOfPlayers shoe players dealerHand phase secondOrigCardDealt =
+playRound :: Int -> Int -> Shoe -> [Player] -> DealerHand -> Phase -> Bool -> MainOrSplitHand -> IO ()
+playRound currPlayerNum numberOfPlayers shoe players dealerHand phase secondOrigCardDealt mainOrSplitHand =
   case phase of
     Bets -> do
       putStrLn $ "Player " ++ (show $ currPlayerNum + 1) ++ 
@@ -23,43 +23,76 @@ playRound currPlayerNum numberOfPlayers shoe players dealerHand phase secondOrig
           let updatedPlayers = addMainBetAmtToPlayer currPlayerNum players betAmt
           case updatedPlayerNum < numberOfPlayers of
             True -> do
-              playRound updatedPlayerNum numberOfPlayers shoe updatedPlayers dealerHand phase secondOrigCardDealt
+              playRound updatedPlayerNum numberOfPlayers shoe updatedPlayers dealerHand
+                phase secondOrigCardDealt mainOrSplitHand
             False -> do
               putStrLn "Round begins..."
               threadDelay 1000000
-              playRound updatedPlayerNum numberOfPlayers shoe updatedPlayers dealerHand (DealOrigCardToPlayer :: Phase) secondOrigCardDealt
+              playRound 0 numberOfPlayers shoe updatedPlayers dealerHand
+                (DealOrigCardToPlayer :: Phase) secondOrigCardDealt mainOrSplitHand
         False -> do
           putStrLn $ "The amount you entered is invalid."
-          playRound currPlayerNum numberOfPlayers shoe players dealerHand (Bets :: Phase) secondOrigCardDealt
+          playRound currPlayerNum numberOfPlayers shoe players dealerHand phase secondOrigCardDealt mainOrSplitHand
     DealOrigCardToPlayer -> do
       let (card, updatedShoe) = (head shoe, tail shoe)
       let updatedPlayers = addCardToPlayerHand card True currPlayerNum (Main :: MainOrSplitHand) players
       let updatedPlayerNum = currPlayerNum + 1
       playRound updatedPlayerNum numberOfPlayers updatedShoe updatedPlayers dealerHand 
         (if updatedPlayerNum < numberOfPlayers then (DealOrigCardToPlayer :: Phase) 
-        else (DealOrigCardToDealer :: Phase)) secondOrigCardDealt
+        else (DealOrigCardToDealer :: Phase)) secondOrigCardDealt mainOrSplitHand
     DealOrigCardToDealer -> do
       let (card, updatedShoe) = (head shoe, tail shoe)
-      let updatedDealerHand = ((setShownStatus card (not secondOrigCardDealt)): dealerHand)
+      let updatedDealerHand = ((setShownStatus card (not secondOrigCardDealt)) : dealerHand)
       playRound 0 numberOfPlayers updatedShoe players updatedDealerHand 
-        (if secondOrigCardDealt then (CheckIfDealerHasBlackjack :: Phase) else (DealOrigCardToPlayer :: Phase)) True
+        (if secondOrigCardDealt then (Insurance :: Phase)
+        else (DealOrigCardToPlayer :: Phase)) True mainOrSplitHand
+    Insurance -> do
+      case (getRank $ head (tail dealerHand)) of
+        Ace -> do
+          let insuranceBetAmt = round (getMainBetAmtForPlayer / 2)
+          putStrLn $ "Player " ++ (show $ currPlayerNum + 1) ++ 
+            ", the dealer is showing an Ace. Would you like to buy insurance? " ++
+            "(0 for no insurance; any other number to bet an additional $" ++
+            (insuranceBetAmt) ++ " towards insurance)"
+          move <- getLine
+          putStrLn ""
+          let updatedPlayers = setInsuranceBetAmtForPlayer currPlayerNum players (insuranceBetAmt $ read move == 0)
+          if (getInsuranceBetAmtForPlayer currPlayerNum players > 0) then
+            showPlayersAndDealerHand updatedPlayers dealerHand False False
+          else
+            putStr ""
+          let updatedPlayerNum = currPlayerNum + 1
+          case updatedPlayerNum < numberOfPlayers of
+            True  ->
+              playRound updatedPlayerNum numberOfPlayers shoe updatedPlayers dealerHand
+                (Insurance :: Phase) True mainOrSplitHand
+            False ->
+              playRound 0 numberOfPlayers shoe updatedPlayers dealerHand
+                (CheckIfDealerHasBlackjack :: Phase) True mainOrSplitHand
+        _ ->
+          playRound 0 numberOfPlayers shoe players dealerHand
+                (NaturalsWithoutDealerBlackjack :: Phase) True mainOrSplitHand
     CheckIfDealerHasBlackjack -> do
+      putStrLn $ "\nDealer surreptitiously checks for Blackjack...\n"
+      threadDelay 1000000
       let dealerHasBlackjack = (getSumOfHand dealerHand) == 21
-      if dealerHasBlackjack then putStrLn "\nDealer has Blackjack.\n" else putStrLn ""
+      if dealerHasBlackjack then
+        putStrLn "\nDealer has Blackjack.\n" else putStrLn "\nDealer doesn't have Blackjack.\n"
       let updatedDealerHand = ((setShownStatus card dealerHasBlackjack): dealerHand)
       showPlayersAndDealerHand players updatedDealerHand dealerHasBlackjack dealerHasBlackjack
       playRound 0 numberOfPlayers shoe players dealerHand 
         (if dealerHasBlackjack then (NaturalsWithDealerBlackjack :: Phase) 
-        else (NaturalsWithoutDealerBlackjack :: Phase)) True
+        else (NaturalsWithoutDealerBlackjack :: Phase)) True mainOrSplitHand
     NaturalsWithDealerBlackjack -> do
-      let sumOfPlayerHand = getSumOfHandForPlayer currPlayerNum (Main :: MainOrSplitHand) players
+      let sumOfPlayerHand = getSumOfHandForPlayer currPlayerNum mainOrSplitHand players
       let handStatus = determineHandStatus sumOfPlayerHand 21 phase (Pending :: HandStatus)
-      let updatedPlayers = setStatusForPlayerHand handStatus currPlayerNum (Main :: MainOrSplitHand) players
+      let updatedPlayers = setStatusForPlayerHand handStatus currPlayerNum mainOrSplitHand players
+      putStr (show mainOrSplitHand) ++ " hand: "
       showFinalHandStatus currPlayerNum handStatus
       let updatedPlayerNum = currPlayerNum + 1
       case updatedPlayerNum < numberOfPlayers of
         True -> playRound updatedPlayerNum numberOfPlayers shoe 
-          updatedPlayers dealerHand (NaturalsWithDealerBlackjack :: Phase) True
+          updatedPlayers dealerHand (NaturalsWithDealerBlackjack :: Phase) True mainOrSplitHand
         False -> do
           putStrLn ""
           return ()
@@ -69,36 +102,67 @@ playRound currPlayerNum numberOfPlayers shoe players dealerHand phase secondOrig
       --Using 0 for sumOfDealerHand to denote that
       --it isn't used by determineHandStatus in the NaturalsWithoutDealerBlackjack phase
       let handStatus = determineHandStatus sumOfPlayerHand 0 phase (Pending :: HandStatus)
-      showPlayerHandStatus currPlayerNum handStatus
       let updatedPlayers = setStatusForPlayerHand handStatus currPlayerNum (Main :: MainOrSplitHand) players
+      showPlayerHandStatus currPlayerNum handStatus
       let updatedPlayerNum = currPlayerNum + 1
       case updatedPlayerNum < numberOfPlayers of
         True -> playRound updatedPlayerNum numberOfPlayers shoe updatedPlayers 
-          dealerHand (NaturalsWithoutDealerBlackjack :: Phase) True
-        False -> playRound 0 numberOfPlayers shoe updatedPlayers dealerHand (Splits :: Phase) True
+          dealerHand (NaturalsWithoutDealerBlackjack :: Phase) True mainOrSplitHand
+        False -> playRound 0 numberOfPlayers shoe updatedPlayers dealerHand (Splits :: Phase) True mainOrSplitHand
     Splits -> do
-      case (canSplit currPlayerNum players) of
-        True -> do
-          putStrLn $ "Player " ++ (show $ currPlayerNum + 1) ++ 
-            ", would you like to split your hand? (0 to not split; any other number to split)"
-          move <- getLine
-          putStrLn ""
-          let split = move
-          case split of
-            0 -> do
-              
+      if (canSplit currPlayerNum players) then do
+        putStrLn $ "Player " ++ (show $ currPlayerNum + 1) ++
+          ", would you like to split your hand? Splitting will cost you an additional $" ++
+          (show getMainBetAmtForPlayer) ++ ". (Enter 0 to not split; any other number to split)"
+        move <- getLine
+        putStrLn ""
+        let split = (read move == 0)
+      else do
+        let split = False
+      if split then do
+        let updatedPlayers = splitHand currPlayerNum players
+        showPlayersAndDealerHand updatedPlayers dealerHand False False
+      else do
+        let updatedPlayers = players
+      playRound currPlayerNum numberOfPlayers show updatedPlayers dealerHand (DoubleDown :: Phase) True mainOrSplitHand
+    DoubleDown -> do
+      if (canDoubleDown currPlayerNum players) then do
+        putStrLn $ "Player " ++ (show $ currPlayerNum + 1) ++
+          ", would you like to double down on your " ++ (show mainOrSplitHand) ++
+          " hand? Doubling down will cost you an additional $" ++
+          (show getMainBetAmtForPlayer) ++ ". (Enter 0 to not double down; any other number to split)"
+        move <- getLine
+        putStrLn ""
+        let doubledDown = (read move == 0)
+      else do
+        let doubledDown = False
+      if doubledDown then do
+        let updatedPlayers = doubleDownHand currPlayerNum mainOrSplitHand players
+        showPlayersAndDealerHand updatedPlayers dealerHand False False
+        playRound currPlayerNum numberOfPlayers show updatedPlayers dealerHand (PlayerHits :: Phase) secondOrigCardDealt mainOrSplitHand
+      else
+        playRound currPlayerNum numberOfPlayers show updatedPlayers dealerHand (PlayerHits :: Phase) secondOrigCardDealt mainOrSplitHand
     PlayerHits -> do
-      case (getResultForPlayer currPlayerNum players) of
+      getStatusForPlayerHand
+      case (getStatusForPlayerHand currPlayerNum players) of
         Pending -> do
+          if secondOrigCardDealt mainOrSplitHand then
+            let mainOrSplitHand = (Main :: MainOrSplitHand)
+          else do
+            let mainOrSplitHand = (Split :: MainOrSplitHand)
           putStrLn $ "Player " ++ (show $ currPlayerNum + 1) ++ 
             ", would you like to hit? (0 to stand; any other number to hit)"
           move <- getLine
           putStrLn ""
           let hit = read move
+          if (read move == 0) then do
+            let updatedPlayers = setResultForPlayer (Standing :: Result) currPlayerNum players
+          else
+            updatedPlayers = players
           case hit of
             0 -> do
               let updatedPlayers = setResultForPlayer (Standing :: Result) currPlayerNum players
-              playRound currPlayerNum numberOfPlayers shoe updatedPlayers dealerHand (PlayerHits :: Phase) True
+              playRound currPlayerNum numberOfPlayers shoe updatedPlayers dealerHand (PlayerHits :: Phase) secondOrigCardDealt mainOrSplitHand
             _ -> do
               let (card, updatedShoe) = (head shoe, tail shoe)
               let updatedPlayers = addCardToPlayerHand card currPlayerNum players
@@ -115,7 +179,7 @@ playRound currPlayerNum numberOfPlayers shoe players dealerHand phase secondOrig
         _ ->  do
           let updatedPlayerNum = currPlayerNum + 1
           case updatedPlayerNum < numberOfPlayers of
-            True -> playRound updatedPlayerNum numberOfPlayers shoe players dealerHand (PlayerHits :: Phase) True
+            True -> playRound updatedPlayerNum numberOfPlayers shoe players dealerHand (Splits :: Phase) True
             False -> do
               putStrLn $ "\nDealer (revealing hidden card) has:\n"
               (showHand . reverse) dealerHand
@@ -169,4 +233,4 @@ main = do
   let d = (read numberOfDecks :: Int)
   deck <- shuffle allCards
   shoe <- shuffle (concat $ take d $ repeat deck)
-  playRound 0 p shoe ([]) ([]) (Bets :: Phase) False
+  playRound 0 p shoe ([]) ([]) (Bets :: Phase) False (Main :: MainOrSplitHand)
