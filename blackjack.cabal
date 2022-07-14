@@ -9,6 +9,7 @@ extra-source-files:   CHANGELOG.md
 
 executable blackjack
   main-is:            Blackjack.hs
+  other-modules:      Data, Helpers
   build-depends:      base ^>=4.14.3.0,
                       ansi-terminal,
                       mtl,
