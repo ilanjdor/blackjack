@@ -18,9 +18,10 @@ type HandPair = (Hand, Hand) --(main hand, split hand)
 data MainOrSplitHand = Main | Split --Main is main hand; Split is split hand
 
 data HandStatus = Pending | Blackjack | NaturalLoss | NaturalTie |
+  SplitNonAcesUndrawn | SplitNonAcesDrawn |
   SplitAcesUndrawn | SplitAcesDrawn |
   DoubleDownUndrawn | DoubleDownDrawn |
-  SplitPairs | DoubleDown | Insurance |
+  SplitPairs | DoubleDowned |
   Standing | Hit21 | HandBust |
   DealerBust | LowerThanDealer | SameAsDealer | HigherThanDealer deriving (Eq, Show)
 
@@ -39,6 +40,7 @@ type Player = (Int, HandPair, Double, Double)
 
 data Phase = DealOrigCardToPlayer | DealOrigCardToDealer |
   CheckIfDealerHasBlackjack | NaturalsWithDealerBlackjack | NaturalsWithoutDealerBlackjack |
+  Splitting | DoubleDown | Insurance |
   PlayerHits | DealerHits | FinalResults | Settle deriving Eq
 
 --Taken from:
@@ -221,7 +223,24 @@ setStatusForPlayerHand newHandStatus currPlayerNum mainOrSplitHand ((playerNum,
         ((xs, newHandStatus), (ys, splitHandStatus)), mainBetAmt, insuranceBetAmt) : zs
       Split -> (playerNum,
         ((xs, mainHandStatus), (ys, newHandStatus)), mainBetAmt, insuranceBetAmt) : zs
-    False -> setStatusForPlayerHand newHandStatus currPlayerNum mainOrSplitHand zs
+    False -> (playerNum, ((xs, mainHandStatus), (ys, splitHandStatus)), mainBetAmt, insuranceBetAmt) :
+      (setStatusForPlayerHand newHandStatus currPlayerNum mainOrSplitHand zs)
+
+canSplit :: Int -> [Player] -> Bool
+canSplit currPlayerNum ((playerNum, ((xs, _), _), _, _) : zs) =
+  case currPlayerNum == playerNum of
+    True  -> getValue (head xs) == getValue (head $ tail xs)
+    False -> canSplit currPlayerNum zs
+
+splitHand :: Int -> [Player] -> [Player]
+splitHand currPlayerNum  ((playerNum,
+  ((xs, mainHandStatus), (ys, splitHandStatus)), mainBetAmt, insuranceBetAmt) : zs) =
+
+  case currPlayerNum == playerNum of
+    True  -> let newHandStatus = (if (getRank $ head xs) == Ace then SplitNonAcesUndrawn else SplitNonAcesUndrawn) in
+      (playerNum, (([head xs], newHandStatus), ([head xs], newHandStatus)), mainBetAmt, insuranceBetAmt) : zs
+    False -> (playerNum, ((xs, mainHandStatus), (ys, splitHandStatus)), mainBetAmt, insuranceBetAmt) :
+      splitHand currPlayerNum zs
 
 {- getResultForPlayer :: Int -> [Player] -> Result
 getResultForPlayer currPlayerNum ((playerNum, result, _, _, _) : xs) =
@@ -427,7 +446,9 @@ playRound currPlayerNum numberOfPlayers shoe players dealerHand phase secondOrig
       case updatedPlayerNum < numberOfPlayers of
         True -> playRound updatedPlayerNum numberOfPlayers shoe updatedPlayers 
           dealerHand (NaturalsWithoutDealerBlackjack :: Phase) True
-        False -> playRound 0 numberOfPlayers shoe updatedPlayers dealerHand (PlayerHits :: Phase) True
+        False -> playRound 0 numberOfPlayers shoe updatedPlayers dealerHand (Splitting :: Phase) True
+    Splitting -> do
+      let get
     PlayerHits -> do
       case (getResultForPlayer currPlayerNum players) of
         Pending -> do
