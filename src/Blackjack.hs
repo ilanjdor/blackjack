@@ -120,17 +120,34 @@ playRound currPlayerNum numberOfPlayers shoe players dealerHand phase secondOrig
       else do
         let split = False
       if split then do
+        putStr $ "Splitting hand..."
+        threadDelay 1000000
         let updatedPlayers = splitHand currPlayerNum players
-        showPlayersAndDealerHand updatedPlayers dealerHand False False
-      else do
-        let updatedPlayers = players
-      playRound currPlayerNum numberOfPlayers show updatedPlayers dealerHand (DoubleDown :: Phase) True mainOrSplitHand
+        let handStatus = getStatusForPlayerHand currPlayerNum mainOrSplitHand updatedPlayers
+        if handStatus == (SplitAcesUndrawn :: HandStatus) then do
+          putStr $ "Split Aces get exactly one more card, face up..."
+          threadDelay 1000000
+          let (card, updatedShoe) = (head shoe, tail shoe)
+          let updatedPlayers2 = addCardToPlayerHand card True
+                                  currPlayerNum (Main :: MainOrSplitHand) updatedPlayers
+          let (nextCard, updatedShoe2) = (head updatedShoe, tail updatedShoe)
+          let updatedPlayers3 = addCardToPlayerHand nextCard True
+                                  currPlayerNum (Split :: MainOrSplitHand) updatedPlayers2
+          let updatedPlayers4 = setStatusForPlayerHand (SplitAcesDrawn :: HandStatus) 
+                                  currPlayerNum (Main :: MainOrSplitHand) updatedPlayers3
+          let updatedPlayers5 = setStatusForPlayerHand (SplitAcesDrawn :: HandStatus)
+                                   currPlayerNum (Split :: MainOrSplitHand) updatedPlayers4
+          showPlayersAndDealerHand updatedPlayers5 dealerHand False False
+        else
+          showPlayersAndDealerHand updatedPlayers dealerHand False False
+      else playRound currPlayerNum numberOfPlayers show players dealerHand
+        (DoubleDown :: Phase) True mainOrSplitHand
     DoubleDown -> do
-      if (canDoubleDown currPlayerNum players) then do
+      if (canDoubleDownHand currPlayerNum mainOrSplitHand players) then do
         putStrLn $ "Player " ++ (show $ currPlayerNum + 1) ++
           ", would you like to double down on your " ++ (show mainOrSplitHand) ++
           " hand? Doubling down will cost you an additional $" ++
-          (show getMainBetAmtForPlayer) ++ ". (Enter 0 to not double down; any other number to split)"
+          (show getMainBetAmtForPlayer) ++ ". (Enter 0 to not double down; any other number to double down)"
         move <- getLine
         putStrLn ""
         let doubledDown = (read move == 0)

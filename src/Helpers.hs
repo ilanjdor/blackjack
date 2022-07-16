@@ -208,7 +208,7 @@ splitHand currPlayerNum  ((playerNum,
   ((xs, mainHandStatus), (ys, splitHandStatus)), mainBetAmt, insuranceBetAmt) : zs) =
 
   case currPlayerNum == playerNum of
-    True  -> let newHandStatus = (if (getRank $ head xs) == Ace then SplitNonAcesUndrawn else SplitNonAcesUndrawn) in
+    True  -> let newHandStatus = (if (getRank $ head xs) == Ace then SplitAcesUndrawn else SplitNonAcesUndrawn) in
       (playerNum, (([head xs], newHandStatus), ([head xs], newHandStatus)), mainBetAmt, insuranceBetAmt) : zs
     False -> (playerNum, ((xs, mainHandStatus), (ys, splitHandStatus)), mainBetAmt, insuranceBetAmt) :
       splitHand currPlayerNum zs
@@ -218,18 +218,22 @@ doubleDownHand currPlayerNum mainOrSplitHand ((playerNum,
   ((xs, mainHandStatus), (ys, splitHandStatus)), mainBetAmt, insuranceBetAmt) : zs) =
 
   case currPlayerNum == playerNum of
-    True  -> case mainOrSplitHand of
-      Main -> (playerNum, ((xs, (DoubleDownUndrawn :: HandStatus)), (ys, splitHandStatus)), mainBetAmt * 2, insuranceBetAmt) : zs
-      Split -> (playerNum, ((xs, mainHandStatus), (ys, (DoubleDownUndrawn :: HandStatus))), mainBetAmt * 2, insuranceBetAmt) : zs
+    True  -> let newHandStatus = (if (getStatusForPlayerHand currPlayerNum mainOrSplitHand ((playerNum,
+                                  ((xs, mainHandStatus), (ys, splitHandStatus)), mainBetAmt, insuranceBetAmt) : zs) ==
+                                  SplitAcesDrawn)
+                                  then DoubleDownDrawn else DoubleDownUndrawn) in
+      case mainOrSplitHand of
+        Main -> (playerNum, ((xs, newHandStatus), (ys, splitHandStatus)), mainBetAmt * 2, insuranceBetAmt) : zs
+        Split -> (playerNum, ((xs, mainHandStatus), (ys, newHandStatus)), mainBetAmt * 2, insuranceBetAmt) : zs
     False -> (playerNum, ((xs, mainHandStatus), (ys, splitHandStatus)), mainBetAmt, insuranceBetAmt) :
       doubleDownHand currPlayerNum mainOrSplitHand zs
 
-canDoubleDown :: Int -> MainOrSplitHand -> [Player] -> Bool
-canDoubleDown currPlayerNum mainOrSplitHand ((playerNum, ((xs, _), (ys, _)), _, _) : zs) = do
+canDoubleDownHand :: Int -> MainOrSplitHand -> [Player] -> Bool
+canDoubleDownHand currPlayerNum mainOrSplitHand ((playerNum, ((xs, _), (ys, _)), _, _) : zs) = do
   let hand = (if (mainOrSplitHand == Main) then xs else ys)
   if currPlayerNum == playerNum then do
     let sum = getSumOfHand hand in (sum >= 9 && sum <= 11)
-  else canDoubleDown currPlayerNum mainOrSplitHand zs
+  else canDoubleDownHand currPlayerNum mainOrSplitHand zs
 
 -- IO functions to display game output
 showHandStatus :: HandStatus -> IO ()
